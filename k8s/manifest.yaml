@@ -20,6 +20,7 @@ spec:
   target:
     name: whatsapp-mcp-secrets
     creationPolicy: Owner
+    deletionPolicy: Retain
   dataFrom:
     - extract: { key: secret/whatsapp-mcp }
 
