@@ -396,6 +396,26 @@ spec:
   selector: { app: mcp-server }
   ports: [{ name: http, port: 3000, targetPort: 3000 }]
 ---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: whatsapp-public
+  namespace: whatsapp-mcp
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: whatsapp.e-dani.com
+    external-dns.alpha.kubernetes.io/target: "57.129.17.172"
+    external-dns.alpha.kubernetes.io/cloudflare-proxied: "true"
+spec:
+  entryPoints: [websecure]
+  ingressClassName: traefik-edge
+  routes:
+    - match: Host(`whatsapp.e-dani.com`)
+      kind: Rule
+      services:
+        - name: whatsapp-connector
+          port: 3001
+  tls: {}
+---
 # Auto-reply worker
 # Auto-reply rules config — rules array populated by admin when needed
 apiVersion: v1
