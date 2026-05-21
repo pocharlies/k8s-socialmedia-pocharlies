@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "whatsapp-mcp": {
+      "command": "node",
+      "args": ["/path/to/whatsappmcp/mcp-server/dist/mcp/index.js"],
+      "env": {
+        "DATABASE_URL": "postgresql://whatsappmcp:YOUR_DB_PASSWORD@localhost:5432/whatsappmcp",
+        "REDIS_URL": "redis://localhost:6379",
+        "OPENAI_API_KEY": "your-openai-api-key",
+        "ENCRYPTION_KEY": "your-32-character-encryption-key",
+        "CONNECTOR_SHARED_SECRET": "your-connector-shared-secret",
+        "CONNECTOR_URL": "http://localhost:3001",
+        "ENABLE_SENDING": "false",
+        "EMERGENCY_DISABLE_SENDING": "false"
+      }
+    }
+  }
+}

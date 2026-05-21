@@ -1,5 +1,59 @@
-*.secret
-*.key
-*-secret.yaml
-*.env
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+.env.bak*
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS
 .DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# WhatsApp session data (encrypted)
+connectors/whatsapp-web/session-data/
+connectors/telegram/session-data/
+*.session
+
+# Local backups and snapshots
+backups/
+*.bak
+*.bak.*
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Docker volumes
+postgres_data/
+redis_data/
+nats_data/
+minio_data/
+
+# Temporary files
+tmp/
+temp/
+
+# Claude Code local overrides
+.claude/settings.local.json

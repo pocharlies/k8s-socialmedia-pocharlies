@@ -1,0 +1,353 @@
+# Pin project name so renaming the host directory doesn't break volume / container naming
+# (volumes whatsappmcp_postgres_data etc. and container hostnames are addressed by code/configs elsewhere).
+name: whatsappmcp
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: whatsappmcp
+      POSTGRES_USER: whatsappmcp
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-whatsappmcp_dev}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./certs/postgres.crt:/certs/server.crt:ro
+      - ./certs/postgres.key:/certs/server.key:ro
+      - ./certs/ca.crt:/certs/ca.crt:ro
+    ports:
+      - "5438:5432"
+    command:
+      - bash
+      - -c
+      - |
+        mkdir -p /var/lib/postgresql/data/certs
+        cp /certs/server.crt /var/lib/postgresql/data/certs/server.crt
+        cp /certs/server.key /var/lib/postgresql/data/certs/server.key
+        cp /certs/ca.crt /var/lib/postgresql/data/certs/ca.crt
+        chown -R postgres:postgres /var/lib/postgresql/data/certs
+        chmod 600 /var/lib/postgresql/data/certs/server.key
+        chmod 644 /var/lib/postgresql/data/certs/server.crt /var/lib/postgresql/data/certs/ca.crt
+        exec docker-entrypoint.sh postgres -c ssl=on -c ssl_cert_file=/var/lib/postgresql/data/certs/server.crt -c ssl_key_file=/var/lib/postgresql/data/certs/server.key -c ssl_ca_file=/var/lib/postgresql/data/certs/ca.crt
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U whatsappmcp"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+      - ./config/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+      - ./certs/redis.crt:/certs/redis.crt:ro
+      - ./certs/redis.key:/certs/redis.key:ro
+      - ./certs/ca.crt:/certs/ca.crt:ro
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "--tls", "--cert", "/certs/redis.crt", "--key", "/certs/redis.key", "--cacert", "/certs/ca.crt", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  nats:
+    image: nats:2.10-alpine
+    command: ["-c", "/etc/nats/nats.conf"]
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    volumes:
+      - nats_data:/data
+      - ./config/nats/nats.conf:/etc/nats/nats.conf:ro
+      - ./certs/nats.crt:/certs/nats.crt:ro
+      - ./certs/nats.key:/certs/nats.key:ro
+      - ./certs/ca.crt:/certs/ca.crt:ro
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8222/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001" --certs-dir /certs
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+      - ./certs/minio.crt:/certs/public.crt:ro
+      - ./certs/minio.key:/certs/private.key:ro
+      - ./certs/ca.crt:/certs/CAs/ca.crt:ro
+    healthcheck:
+      test: ["CMD", "curl", "-k", "-f", "https://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  whatsapp-connector:
+    build:
+      context: .
+      dockerfile: ./connectors/whatsapp-web/Dockerfile
+    command: ["sh", "-c", "cd connectors/whatsapp-web && npx tsx src/main.ts"]
+    environment:
+      CONNECTOR_SHARED_SECRET: ${CONNECTOR_SHARED_SECRET:-dev-secret-change-in-production}
+      ENABLE_SENDING: ${ENABLE_SENDING:-true}
+      SESSION_ENCRYPTION_KEY: ${SESSION_ENCRYPTION_KEY:-dev-encryption-key-change-in-production}
+      SESSION_PATH: /app/persistent-session
+      NATS_URL: tls://nats:4222
+      NATS_CA_CERT: /certs/ca.crt
+      PORT: 3001
+      WA_QR_PUBLIC_URL: ${WA_QR_PUBLIC_URL:-https://whatsapp.e-dani.com/}
+      WA_WATCHDOG_INTERVAL_MS: ${WA_WATCHDOG_INTERVAL_MS:-60000}
+      WA_INITIALIZE_MAX_MS: ${WA_INITIALIZE_MAX_MS:-180000}
+      WA_SEND_TIMEOUT_MS: ${WA_SEND_TIMEOUT_MS:-45000}
+      WA_STATE_TIMEOUT_MS: ${WA_STATE_TIMEOUT_MS:-3000}
+      WA_HISTORY_SYNC_ON_LOGIN: ${WA_HISTORY_SYNC_ON_LOGIN:-false}
+      NODE_EXTRA_CA_CERTS: /certs/ca.crt
+      # MinIO — auto-download media to socialmedia-media bucket on incoming messages
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_USE_SSL: "true"
+      MINIO_CA_CERT: /certs/ca.crt
+      MINIO_BUCKET: socialmedia-media
+    volumes:
+      - ./connectors/whatsapp-web/session-data:/app/persistent-session
+      - ./connectors/whatsapp-web/src:/app/connectors/whatsapp-web/src:ro
+      - ./certs/ca.crt:/certs/ca.crt:ro
+      - ./certs/client.crt:/certs/client.crt:ro
+      - ./certs/client.key:/certs/client.key:ro
+    hostname: whatsapp-brain
+    ports:
+      - "3001:3001"
+    depends_on:
+      nats:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://127.0.0.1:3001/api/v1/health',r=>{let d='';r.on('data',c=>d+=c);r.on('end',()=>{try{const j=JSON.parse(d);process.exit(r.statusCode===200&&j.connected===true?0:1)}catch{process.exit(1)}})}).on('error',()=>process.exit(1))\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
+  mcp-server:
+    build:
+      context: .
+      dockerfile: ./mcp-server/Dockerfile
+    command: ["sh", "-c", "cd mcp-server && npx tsx src/main.ts"]
+    environment:
+      DATABASE_URL: postgresql://whatsappmcp:${POSTGRES_PASSWORD:-whatsappmcp_dev}@postgres:5432/whatsappmcp?sslmode=disable
+      REDIS_URL: rediss://redis:6379
+      REDIS_TLS_CA: /certs/ca.crt
+      NATS_URL: tls://nats:4222
+      NATS_CA_CERT: /certs/ca.crt
+      CONNECTOR_SHARED_SECRET: ${CONNECTOR_SHARED_SECRET:-dev-secret-change-in-production}
+      CONNECTOR_URL: http://whatsapp-connector:3001
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-dev-encryption-key-change-in-production}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-not-needed}
+      EMBEDDING_BASE_URL: ${EMBEDDING_BASE_URL:-http://bge-m3-embedding:8000/v1}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-bge-m3}
+      EMBEDDING_DIMENSION: ${EMBEDDING_DIMENSION:-1024}
+      ENABLE_SENDING: ${ENABLE_SENDING:-true}
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      LLM_CHAT_MODEL: ${LLM_CHAT_MODEL:-gpt-4o-mini}
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_USE_SSL: "true"
+      MINIO_CA_CERT: /certs/ca.crt
+      EMERGENCY_DISABLE_SENDING: ${EMERGENCY_DISABLE_SENDING:-false}
+      PORT: 3000
+      NODE_EXTRA_CA_CERTS: /certs/ca.crt
+    volumes:
+      - ./mcp-server/src:/app/mcp-server/src:ro
+      - ./certs/ca.crt:/certs/ca.crt:ro
+      - ./certs/client.crt:/certs/client.crt:ro
+      - ./certs/client.key:/certs/client.key:ro
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:3000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
+  mcp-sse:
+    build:
+      context: .
+      dockerfile: ./mcp-server/Dockerfile
+    command: ["sh", "-c", "cd mcp-server && npx tsx src/mcp/sse-server.ts"]
+    environment:
+      DATABASE_URL: postgresql://whatsappmcp:${POSTGRES_PASSWORD:-whatsappmcp_dev}@postgres:5432/whatsappmcp?sslmode=disable
+      REDIS_URL: rediss://redis:6379
+      REDIS_TLS_CA: /certs/ca.crt
+      CONNECTOR_SHARED_SECRET: ${CONNECTOR_SHARED_SECRET:-dev-secret-change-in-production}
+      CONNECTOR_URL: http://whatsapp-connector:3001
+      TELEGRAM_CONNECTOR_URL: http://telegram-connector:3002
+      INSTAGRAM_CONNECTOR_URL: http://instagram-connector:3003
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-dev-encryption-key-change-in-production}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      ENABLE_SENDING: ${ENABLE_SENDING:-true}
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      LLM_CHAT_MODEL: ${LLM_CHAT_MODEL:-gpt-4o-mini}
+      MCP_SSE_PORT: 3010
+      MCP_SSE_AUTH_TOKEN: 5UyoEnAQRtzisPouXoMy_TAhkF6zUBZCu5RCYOnzLPI
+      NODE_EXTRA_CA_CERTS: /certs/ca.crt
+    volumes:
+      - ./mcp-server/src:/app/mcp-server/src:ro
+      - ./certs/ca.crt:/certs/ca.crt:ro
+      - ./certs/client.crt:/certs/client.crt:ro
+      - ./certs/client.key:/certs/client.key:ro
+    ports:
+      - "3010:3010"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:3010/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
+  telegram-connector:
+    build:
+      context: .
+      dockerfile: ./connectors/telegram/Dockerfile
+    command: ["npx", "tsx", "src/main.ts"]
+    environment:
+      TELEGRAM_API_ID: ${TELEGRAM_API_ID}
+      TELEGRAM_API_HASH: ${TELEGRAM_API_HASH}
+      TELEGRAM_SESSION_STRING: ${TELEGRAM_SESSION_STRING}
+      CONNECTOR_SHARED_SECRET: ${CONNECTOR_SHARED_SECRET:-dev-secret-change-in-production}
+      SESSION_ENCRYPTION_KEY: ${SESSION_ENCRYPTION_KEY:-dev-encryption-key-change-in-production}
+      SESSION_PATH: /app/persistent-session
+      NATS_URL: tls://nats:4222
+      NATS_CA_CERT: /certs/ca.crt
+      PORT: 3002
+      NODE_EXTRA_CA_CERTS: /certs/ca.crt
+    volumes:
+      - ./connectors/telegram/session-data:/app/session-data
+      - ./connectors/telegram/src:/app/connectors/telegram/src:ro
+      - ./certs/ca.crt:/certs/ca.crt:ro
+      - ./certs/client.crt:/certs/client.crt:ro
+      - ./certs/client.key:/certs/client.key:ro
+    ports:
+      - "3002:3002"
+    depends_on:
+      nats:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:3002/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
+  auto-reply-worker:
+    build:
+      context: ./workers/auto-reply-worker
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql://whatsappmcp:${POSTGRES_PASSWORD:-whatsappmcp_dev}@postgres:5432/whatsappmcp?sslmode=disable
+      NATS_URL: tls://nats:4222
+      NATS_CA_CERT: /certs/ca.crt
+      CONNECTOR_URL: http://whatsapp-connector:3001/api/v1/messages/send
+      CONNECTOR_SECRET: ${CONNECTOR_SHARED_SECRET:-dev-secret-change-in-production}
+      LLM_URL: https://dgx.e-dani.com/v1/chat/completions
+      LLM_API_KEY: ${LLM_API_KEY}
+      LLM_MODEL: ${LLM_MODEL:-local}
+      LLM_OMNI_MODEL: ${LLM_OMNI_MODEL:-omni}
+      LLM_OMNI_MAX_TOKENS: ${LLM_OMNI_MAX_TOKENS:-500}
+      CONFIG_PATH: /worker/config.json
+      NODE_EXTRA_CA_CERTS: /certs/ca.crt
+      REPLY_DELAY_MS: 2500
+    volumes:
+      - ./workers/auto-reply-worker/config.json:/worker/config.json:ro
+      - ./certs/ca.crt:/certs/ca.crt:ro
+    depends_on:
+      nats:
+        condition: service_healthy
+      whatsapp-connector:
+        condition: service_started
+    restart: unless-stopped
+
+
+  instagram-connector:
+    build:
+      context: .
+      dockerfile: ./connectors/instagram/Dockerfile
+    environment:
+      INSTAGRAM_ACCOUNTS: ${INSTAGRAM_ACCOUNTS}
+      INSTAGRAM_SKIRMSHOP_ACCESS_TOKEN: ${INSTAGRAM_SKIRMSHOP_ACCESS_TOKEN}
+      INSTAGRAM_SKIRMSHOP_BUSINESS_ACCOUNT_ID: ${INSTAGRAM_SKIRMSHOP_BUSINESS_ACCOUNT_ID}
+      INSTAGRAM_BARBELPAPIS_ACCESS_TOKEN: ${INSTAGRAM_BARBELPAPIS_ACCESS_TOKEN}
+      INSTAGRAM_BARBELPAPIS_BUSINESS_ACCOUNT_ID: ${INSTAGRAM_BARBELPAPIS_BUSINESS_ACCOUNT_ID}
+      INSTAGRAM_SKIRMSHOP_FB_ACCESS_TOKEN: ${INSTAGRAM_SKIRMSHOP_FB_ACCESS_TOKEN:-}
+      INSTAGRAM_BARBELPAPIS_FB_ACCESS_TOKEN: ${INSTAGRAM_BARBELPAPIS_FB_ACCESS_TOKEN:-}
+      FACEBOOK_APP_ID: ${FACEBOOK_APP_ID}
+      FACEBOOK_APP_SECRET: ${FACEBOOK_APP_SECRET}
+      WEBHOOK_VERIFY_TOKEN: ${INSTAGRAM_WEBHOOK_VERIFY_TOKEN}
+      NATS_URL: tls://nats:4222
+      NATS_CA_CERT: /certs/ca.crt
+      PORT: 3003
+      NODE_EXTRA_CA_CERTS: /certs/ca.crt
+    volumes:
+      - ./certs/ca.crt:/certs/ca.crt:ro
+    ports:
+      - "3003:3003"
+    depends_on:
+      nats:
+        condition: service_healthy
+    restart: unless-stopped
+
+  whatsapp-cloud-connector:
+    build:
+      context: .
+      dockerfile: ./connectors/whatsapp-cloud/Dockerfile
+    environment:
+      WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN}
+      WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID}
+      WHATSAPP_BUSINESS_ACCOUNT_ID: ${WHATSAPP_BUSINESS_ACCOUNT_ID}
+      FACEBOOK_APP_SECRET: ${FACEBOOK_APP_SECRET}
+      WHATSAPP_WEBHOOK_VERIFY_TOKEN: ${WHATSAPP_WEBHOOK_VERIFY_TOKEN}
+      CONNECTOR_SHARED_SECRET: ${CONNECTOR_SHARED_SECRET:-dev-secret-change-in-production}
+      NATS_URL: tls://nats:4222
+      NATS_CA_CERT: /certs/ca.crt
+      PORT: 3004
+      NODE_EXTRA_CA_CERTS: /certs/ca.crt
+    volumes:
+      - ./certs/ca.crt:/certs/ca.crt:ro
+    ports:
+      - "3004:3004"
+    depends_on:
+      nats:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  nats_data:
+  minio_data:

@@ -1,4 +1,12 @@
 ---
+# SETUP (one-time, before first ArgoCD sync):
+#   kubectl create secret docker-registry ghcr-pull-secret \
+#     --docker-server=ghcr.io \
+#     --docker-username=pocharlies \
+#     --docker-password=<GITHUB_PAT_with_read:packages> \
+#     -n whatsapp-mcp
+# After first `tilt up` or CD push, make GHCR packages public to avoid needing the secret:
+#   GitHub → pocharlies → Packages → <each image> → Settings → Make public
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -7,7 +15,7 @@ metadata:
 # WhatsApp MCP — multi-connector messaging platform
 # Connectors: whatsapp, instagram, telegram; MCP server + SSE bridge
 # Stateful: postgres (pgvector), redis, nats, minio
-# Migration strategy (Phase 9): pg_dump + restore, mc mirror for minio
+# Images: GHCR (ghcr.io/pocharlies/socialmedia-*) — built by GitHub Actions on push to main
 
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
@@ -245,10 +253,11 @@ spec:
     metadata: { labels: { app: whatsapp-connector } }
     spec:
       enableServiceLinks: false
+      imagePullSecrets: [{name: ghcr-pull-secret}]
       nodeSelector: { topology: lan, kubernetes.io/arch: amd64 }
       containers:
         - name: whatsapp-connector
-          image: harbor.e-dani.com/homelab/whatsappmcp-whatsapp-connector:latest
+          image: ghcr.io/pocharlies/socialmedia-whatsapp-connector:latest
           ports: [{ name: http, containerPort: 3001 }]
           env:
             - { name: REDIS_URL, value: "redis://whatsapp-mcp-redis.whatsapp-mcp.svc.cluster.local:6379" }
@@ -281,10 +290,11 @@ spec:
     metadata: { labels: { app: whatsapp-cloud-connector } }
     spec:
       enableServiceLinks: false
+      imagePullSecrets: [{name: ghcr-pull-secret}]
       nodeSelector: { topology: lan, kubernetes.io/arch: amd64 }
       containers:
         - name: whatsapp-cloud-connector
-          image: harbor.e-dani.com/homelab/whatsappmcp-whatsapp-cloud-connector:latest
+          image: ghcr.io/pocharlies/socialmedia-whatsapp-cloud-connector:latest
           ports: [{ name: http, containerPort: 3004 }]
           env:
             - { name: NATS_URL, value: "nats://whatsapp-mcp-nats.whatsapp-mcp.svc.cluster.local:4222" }
@@ -312,10 +322,11 @@ spec:
     metadata: { labels: { app: instagram-connector } }
     spec:
       enableServiceLinks: false
+      imagePullSecrets: [{name: ghcr-pull-secret}]
       nodeSelector: { topology: lan, kubernetes.io/arch: amd64 }
       containers:
         - name: instagram-connector
-          image: harbor.e-dani.com/homelab/whatsappmcp-instagram-connector:latest
+          image: ghcr.io/pocharlies/socialmedia-instagram-connector:latest
           ports: [{ name: http, containerPort: 3003 }]
           env:
             - { name: NATS_URL, value: "nats://whatsapp-mcp-nats.whatsapp-mcp.svc.cluster.local:4222" }
@@ -343,10 +354,11 @@ spec:
     metadata: { labels: { app: telegram-connector } }
     spec:
       enableServiceLinks: false
+      imagePullSecrets: [{name: ghcr-pull-secret}]
       nodeSelector: { topology: lan, kubernetes.io/arch: amd64 }
       containers:
         - name: telegram-connector
-          image: harbor.e-dani.com/homelab/whatsappmcp-telegram-connector:latest
+          image: ghcr.io/pocharlies/socialmedia-telegram-connector:latest
           ports: [{ name: http, containerPort: 3002 }]
           env:
             - { name: NATS_URL, value: "nats://whatsapp-mcp-nats.whatsapp-mcp.svc.cluster.local:4222" }
@@ -375,10 +387,11 @@ spec:
     metadata: { labels: { app: mcp-server } }
     spec:
       enableServiceLinks: false
+      imagePullSecrets: [{name: ghcr-pull-secret}]
       nodeSelector: { topology: lan, kubernetes.io/arch: amd64 }
       containers:
         - name: mcp-server
-          image: harbor.e-dani.com/homelab/whatsappmcp-mcp-server:patched
+          image: ghcr.io/pocharlies/socialmedia-mcp-server:latest
           ports: [{ name: http, containerPort: 3000 }]
           env:
             - { name: NATS_URL, value: "nats://whatsapp-mcp-nats.whatsapp-mcp.svc.cluster.local:4222" }
@@ -417,10 +430,11 @@ spec:
     metadata: { labels: { app: auto-reply-worker } }
     spec:
       enableServiceLinks: false
+      imagePullSecrets: [{name: ghcr-pull-secret}]
       nodeSelector: { topology: lan, kubernetes.io/arch: amd64 }
       containers:
         - name: auto-reply-worker
-          image: harbor.e-dani.com/homelab/whatsappmcp-auto-reply-worker:latest
+          image: ghcr.io/pocharlies/socialmedia-auto-reply-worker:latest
           ports: [{ name: http, containerPort: 3090 }]
           env:
             - { name: NATS_URL, value: "nats://whatsapp-mcp-nats.whatsapp-mcp.svc.cluster.local:4222" }
@@ -458,10 +472,11 @@ spec:
     metadata: { labels: { app: telegram-sync } }
     spec:
       enableServiceLinks: false
+      imagePullSecrets: [{name: ghcr-pull-secret}]
       nodeSelector: { topology: lan, kubernetes.io/arch: amd64 }
       containers:
         - name: telegram-sync
-          image: harbor.e-dani.com/homelab/whatsappmcp-telegram-sync:latest
+          image: ghcr.io/pocharlies/socialmedia-telegram-sync:latest
           ports: [{ name: http, containerPort: 3080 }]
           env:
             - { name: NATS_URL, value: "nats://whatsapp-mcp-nats.whatsapp-mcp.svc.cluster.local:4222" }

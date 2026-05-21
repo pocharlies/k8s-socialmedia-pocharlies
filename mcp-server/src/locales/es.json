@@ -1,0 +1,26 @@
+{
+  "errors": {
+    "MESSAGE_NOT_FOUND": "Mensaje no encontrado",
+    "CHAT_NOT_FOUND": "Conversación no encontrada",
+    "RATE_LIMIT_EXCEEDED": "Límite de velocidad excedido. Por favor, intente de nuevo más tarde.",
+    "DRAFT_NOT_FOUND": "Borrador de respuesta no encontrado",
+    "DRAFT_ALREADY_SENT": "Este borrador ya ha sido enviado",
+    "SENDING_DISABLED": "El envío de mensajes está deshabilitado",
+    "INVALID_SEND_TOKEN": "Token de envío inválido",
+    "EMBEDDING_FAILED": "Error al generar el embedding",
+    "SUMMARIZATION_FAILED": "Error al generar el resumen",
+    "INVALID_INPUT": "Parámetros de entrada inválidos",
+    "UNAUTHORIZED": "Acceso no autorizado"
+  },
+  "messages": {
+    "search_completed": "Búsqueda completada exitosamente",
+    "summary_generated": "Resumen generado exitosamente",
+    "draft_created": "Borrador de respuesta creado",
+    "draft_approved": "Borrador aprobado. Token de envío generado.",
+    "draft_sent": "Mensaje enviado exitosamente"
+  },
+  "summaries": {
+    "brief_template": "Resume la siguiente conversación de WhatsApp en 2-3 oraciones. Incluye temas clave, decisiones tomadas y elementos de acción.",
+    "detailed_template": "Proporciona un resumen completo de esta conversación de WhatsApp. Incluye:\n- Temas principales discutidos\n- Decisiones clave y resultados\n- Elementos de acción con responsables\n- Fechas o plazos importantes\n- Tono y sentimiento"
+  }
+}

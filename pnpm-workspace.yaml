@@ -1,0 +1,8 @@
+packages:
+  - 'connectors/whatsapp-web'
+  - 'connectors/telegram'
+  - 'connectors/instagram'
+  - 'connectors/whatsapp-cloud'
+  - 'mcp-server'
+  - 'shared'
+  - 'workers/auto-reply-worker'

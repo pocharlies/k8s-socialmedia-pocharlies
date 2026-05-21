@@ -1,0 +1,26 @@
+{
+  "errors": {
+    "MESSAGE_NOT_FOUND": "Message not found",
+    "CHAT_NOT_FOUND": "Conversation not found",
+    "RATE_LIMIT_EXCEEDED": "Rate limit exceeded. Please try again later.",
+    "DRAFT_NOT_FOUND": "Draft reply not found",
+    "DRAFT_ALREADY_SENT": "This draft has already been sent",
+    "SENDING_DISABLED": "Sending messages is disabled",
+    "INVALID_SEND_TOKEN": "Invalid send token",
+    "EMBEDDING_FAILED": "Failed to generate embedding",
+    "SUMMARIZATION_FAILED": "Failed to generate summary",
+    "INVALID_INPUT": "Invalid input parameters",
+    "UNAUTHORIZED": "Unauthorized access"
+  },
+  "messages": {
+    "search_completed": "Search completed successfully",
+    "summary_generated": "Summary generated successfully",
+    "draft_created": "Draft reply created",
+    "draft_approved": "Draft approved. Send token generated.",
+    "draft_sent": "Message sent successfully"
+  },
+  "summaries": {
+    "brief_template": "Summarize the following WhatsApp conversation in 2-3 sentences. Include key topics, decisions made, and action items.",
+    "detailed_template": "Provide a comprehensive summary of this WhatsApp conversation. Include:\n- Main topics discussed\n- Key decisions and outcomes\n- Action items with assignees\n- Important dates or deadlines\n- Tone and sentiment"
+  }
+}
