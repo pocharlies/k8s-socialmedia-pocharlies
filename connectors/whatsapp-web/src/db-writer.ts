@@ -13,6 +13,9 @@ let pool: pg.Pool | null = null;
 export function getPool(): pg.Pool {
   if (!pool) {
     pool = new pg.Pool({ connectionString: DATABASE_URL, max: 5 });
+    pool.on('error', (error) => {
+      console.error('PostgreSQL idle client error:', error);
+    });
   }
   return pool;
 }
