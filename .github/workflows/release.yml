@@ -10,6 +10,9 @@ on:
         required: false
         type: string
 
+permissions:
+  contents: write
+
 concurrency:
   group: release-prod-${{ github.repository }}
   cancel-in-progress: false
@@ -30,4 +33,14 @@ jobs:
           {"name":"whatsappmcp-mcp-server","context":".","dockerfile":"mcp-server/Dockerfile"},
           {"name":"whatsappmcp-auto-reply-worker","context":".","dockerfile":"workers/auto-reply-worker/Dockerfile"}
         ]
+    secrets: inherit
+
+  manifests:
+    needs: [release]
+    uses: pocharlies/k8s-gitops-pocharlies/.github/workflows/reusable-manifest-release.yml@main
+    with:
+      runner: arc-amd64
+      source_path: k8s/overlays/prod
+      artifact_name: k8s-socialmedia-pocharlies
+      version: ${{ github.event.inputs.image_tag || github.ref_name }}
     secrets: inherit
