@@ -206,6 +206,8 @@ spec:
             - { name: REDIS_URL, value: "redis://whatsapp-mcp-redis.whatsapp-mcp.svc.cluster.local:6379" }
             - { name: NATS_URL, value: "nats://whatsapp-mcp-nats.whatsapp-mcp.svc.cluster.local:4222" }
             - { name: DATABASE_URL, value: "postgresql://$(DB_USER):$(DB_PASSWORD)@postgres-shared-rw.databases.svc.cluster.local:5432/whatsappmcp" }
+            - { name: EMBEDDING_BASE_URL, value: "http://bge-m3-embedding.llm.svc.cluster.local:8000/v1" }
+            - { name: EMBEDDING_MODEL, value: "bge-m3" }
           envFrom: [{ secretRef: { name: whatsapp-mcp-secrets } }]
           resources:
             requests: { cpu: 50m, memory: 128Mi }
@@ -379,6 +381,8 @@ spec:
             - { name: INSTAGRAM_CONNECTOR_URL, value: "http://instagram-connector.whatsapp-mcp.svc.cluster.local:3003" }
             - { name: LLM_BASE_URL, value: "http://litellm.litellm.svc.cluster.local:4000/v1" }
             - { name: LLM_CHAT_MODEL, value: "tooling" }
+            - { name: EMBEDDING_BASE_URL, value: "http://bge-m3-embedding.llm.svc.cluster.local:8000/v1" }
+            - { name: EMBEDDING_MODEL, value: "bge-m3" }
             - name: MCP_SSE_AUTH_TOKEN
               valueFrom: { secretKeyRef: { name: whatsapp-mcp-sse-secrets, key: MCP_SSE_AUTH_TOKEN } }
           envFrom: [{ secretRef: { name: whatsapp-mcp-secrets } }]
