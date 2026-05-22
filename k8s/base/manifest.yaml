@@ -24,6 +24,17 @@ spec:
   dataFrom:
     - extract: { key: secret/whatsapp-mcp }
 
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: whatsapp-mcp-postgres-data
+  namespace: whatsapp-mcp
+spec:
+  accessModes: [ReadWriteOnce]
+  resources: { requests: { storage: 20Gi } }
+  storageClassName: longhorn
+
 # ── Redis ──────────────────────────────────────────────────────────────────────
 ---
 apiVersion: apps/v1
