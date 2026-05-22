@@ -434,7 +434,8 @@ spec:
       services:
         - name: whatsapp-connector
           port: 3001
-  tls: {}
+  tls:
+    store: { name: default, namespace: traefik-edge }
 ---
 # Auto-reply worker
 # Auto-reply rules config — rules array populated by admin when needed
