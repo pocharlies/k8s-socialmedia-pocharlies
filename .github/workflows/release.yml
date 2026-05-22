@@ -1,23 +1,25 @@
-name: CI
+name: Release Production
 
 on:
-  pull_request:
-    branches: ["**"]
   push:
-    branches: ["**"]
-    tags-ignore: ["**"]
+    tags: ["*"]
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: Optional explicit image tag, for example v1.2.3
+        required: false
+        type: string
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: release-prod-${{ github.repository }}
+  cancel-in-progress: false
 
 jobs:
-  standard:
-    if: ${{ !contains(github.event.head_commit.message || '', '[skip ci]') }}
-    uses: pocharlies/k8s-gitops-pocharlies/.github/workflows/reusable-ci.yml@main
+  release:
+    uses: pocharlies/k8s-gitops-pocharlies/.github/workflows/reusable-release.yml@main
     with:
       runner: arc-amd64
-      kustomize_paths: k8s/overlays/stg k8s/overlays/prod
+      version: ${{ github.event.inputs.image_tag || github.ref_name }}
       images: |
         [
           {"name":"whatsappmcp-whatsapp-connector","context":".","dockerfile":"connectors/whatsapp-web/Dockerfile"},

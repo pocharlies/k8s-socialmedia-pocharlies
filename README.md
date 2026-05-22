@@ -39,6 +39,18 @@ mcp-socialmedia/
 └── docker-compose.yml       # Main compose; docker-compose.override.yml for prod
 ```
 
+## CI/CD + GitOps
+
+This repo follows the cluster standard:
+
+- Every branch push and pull request runs CI on the Kubernetes-hosted ARC runner.
+- Git tags build and push immutable images to Harbor using the tag name.
+- ArgoCD deploys production from `k8s/overlays/prod` when the desired image tag
+  or digest is updated there. Staging still uses the `stg` branch workflow to
+  publish `stg-<sha>` images and stamp `k8s/overlays/stg`.
+
+Operational details are in [docs/runbook.md](docs/runbook.md).
+
 ## LLM
 
 Code uses LiteLLM (commit `07fa1db`) — Ollama removed.
