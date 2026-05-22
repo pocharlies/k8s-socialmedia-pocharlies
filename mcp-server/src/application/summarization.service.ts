@@ -23,9 +23,19 @@ export class SummarizationService {
   private logger: pino.Logger;
   private llmModel: string;
 
-  constructor(openaiApiKey: string, dbClient: Pool, redisUrl: string, _encryptionKey: string, llmBaseUrl?: string, llmModel?: string) {
-    this.openai = new OpenAI({ apiKey: openaiApiKey || "sk-placeholder", ...(llmBaseUrl && { baseURL: llmBaseUrl }) });
-    this.llmModel = llmModel || "gpt-4o-mini";
+  constructor(
+    openaiApiKey: string,
+    dbClient: Pool,
+    redisUrl: string,
+    _encryptionKey: string,
+    llmBaseUrl?: string,
+    llmModel?: string
+  ) {
+    this.openai = new OpenAI({
+      apiKey: openaiApiKey || 'sk-placeholder',
+      ...(llmBaseUrl && { baseURL: llmBaseUrl }),
+    });
+    this.llmModel = llmModel || 'gpt-4o-mini';
     this.dbClient = dbClient;
     this.redis = new Redis(redisUrl);
     this.logger = pino({
@@ -114,24 +124,27 @@ export class SummarizationService {
       const prompt = `${promptTemplate}\n\nConversation:\n${messagesText}`;
 
       // Generate summary using OpenAI
-      const response = await this.openai.chat.completions.create({
-        model: this.llmModel,
-        messages: [
-          {
-            role: 'system',
-            content:
-              language === 'es'
-                ? 'Eres un asistente que resume conversaciones de WhatsApp de manera clara y concisa.'
-                : 'You are an assistant that summarizes WhatsApp conversations clearly and concisely.',
-          },
-          {
-            role: 'user',
-            content: prompt,
-          },
-        ],
-        temperature: 0.7,
-        max_tokens: style === 'brief' ? 200 : 500,
-      }, { timeout: 180_000 });
+      const response = await this.openai.chat.completions.create(
+        {
+          model: this.llmModel,
+          messages: [
+            {
+              role: 'system',
+              content:
+                language === 'es'
+                  ? 'Eres un asistente que resume conversaciones de WhatsApp de manera clara y concisa.'
+                  : 'You are an assistant that summarizes WhatsApp conversations clearly and concisely.',
+            },
+            {
+              role: 'user',
+              content: prompt,
+            },
+          ],
+          temperature: 0.7,
+          max_tokens: style === 'brief' ? 200 : 500,
+        },
+        { timeout: 180_000 }
+      );
 
       const summary = response.choices[0]?.message?.content || 'Failed to generate summary';
 

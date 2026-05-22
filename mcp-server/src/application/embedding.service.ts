@@ -170,11 +170,7 @@ export class EmbeddingService {
           `INSERT INTO message_embeddings (message_id, embedding, model, created_at)
            VALUES ($1, $2::vector, $3, NOW())
            ON CONFLICT DO NOTHING`,
-          [
-            chunk.messageId,
-            `[${chunk.embedding.join(',')}]`,
-            this.EMBEDDING_MODEL,
-          ]
+          [chunk.messageId, `[${chunk.embedding.join(',')}]`, this.EMBEDDING_MODEL]
         );
       } catch (error) {
         this.logger.error(`Error storing embedding for message ${chunk.messageId}: ${error}`);

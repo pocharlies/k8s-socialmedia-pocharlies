@@ -1,9 +1,15 @@
 import express, { Request, Response } from 'express';
-import { BaileysClient, classifyWhatsAppSendFailure, WhatsAppSendFailureClass } from '../baileys-client';
+import {
+  BaileysClient,
+  classifyWhatsAppSendFailure,
+  WhatsAppSendFailureClass,
+} from '../baileys-client';
 import { QRHandler } from '../qr-handler';
 import { createHMACAuth, AuthenticatedRequest } from './auth';
 
-function statusForSendFailure(failureClass: WhatsAppSendFailureClass | 'disabled_sending' | 'invalid_request'): number {
+function statusForSendFailure(
+  failureClass: WhatsAppSendFailureClass | 'disabled_sending' | 'invalid_request'
+): number {
   if (failureClass === 'invalid_request') return 400;
   if (failureClass === 'disabled_sending') return 403;
   if (failureClass === 'disconnected') return 503;
@@ -74,7 +80,9 @@ export function createRouter(
         const { sendToken, conversationId, content } = body;
 
         if (!sendToken || !conversationId || !content) {
-          console.warn(`WhatsApp send rejected failureClass=invalid_request conversationId=${conversationId || ''}`);
+          console.warn(
+            `WhatsApp send rejected failureClass=invalid_request conversationId=${conversationId || ''}`
+          );
           res.status(statusForSendFailure('invalid_request')).json({
             error: 'Missing required fields',
             failureClass: 'invalid_request',
@@ -85,7 +93,9 @@ export function createRouter(
         // In production, validate sendToken here
         // For now, we'll just check if sending is enabled
         if (process.env.ENABLE_SENDING !== 'true') {
-          console.warn(`WhatsApp send blocked failureClass=disabled_sending conversationId=${conversationId}`);
+          console.warn(
+            `WhatsApp send blocked failureClass=disabled_sending conversationId=${conversationId}`
+          );
           res.status(statusForSendFailure('disabled_sending')).json({
             error: 'Sending is disabled',
             failureClass: 'disabled_sending',
@@ -94,7 +104,9 @@ export function createRouter(
         }
 
         if (process.env.EMERGENCY_DISABLE_SENDING === 'true') {
-          console.warn(`WhatsApp send blocked failureClass=disabled_sending reason=emergency_disable conversationId=${conversationId}`);
+          console.warn(
+            `WhatsApp send blocked failureClass=disabled_sending reason=emergency_disable conversationId=${conversationId}`
+          );
           res.status(statusForSendFailure('disabled_sending')).json({
             error: 'Sending is emergency disabled',
             failureClass: 'disabled_sending',
@@ -103,7 +115,9 @@ export function createRouter(
         }
 
         if (!client.isConnected()) {
-          console.warn(`WhatsApp send blocked failureClass=disconnected conversationId=${conversationId} state=${client.getCachedState() || 'unknown'}`);
+          console.warn(
+            `WhatsApp send blocked failureClass=disconnected conversationId=${conversationId} state=${client.getCachedState() || 'unknown'}`
+          );
           res.status(statusForSendFailure('disconnected')).json({
             error: `WhatsApp is not connected (state=${client.getCachedState() || 'unknown'})`,
             failureClass: 'disconnected',
@@ -113,7 +127,9 @@ export function createRouter(
         }
 
         const messageId = await client.sendMessage(conversationId, content);
-        console.info(`WhatsApp send ok conversationId=${conversationId} messageId=${messageId || ''}`);
+        console.info(
+          `WhatsApp send ok conversationId=${conversationId} messageId=${messageId || ''}`
+        );
 
         res.json({
           messageId,
@@ -134,7 +150,6 @@ export function createRouter(
       }
     })();
   });
-
 
   // React to a message (requires auth)
   router.post('/messages/react', auth, (req: AuthenticatedRequest, res: Response): void => {
@@ -167,23 +182,23 @@ export function createRouter(
     })();
   });
 
-  // History sync endpoint  
+  // History sync endpoint
   router.post('/history/sync', (req: Request, res: Response): void => {
     const limit = parseInt((req.query as any).limit || '500', 10);
-    
+
     if (!client.isConnected()) {
       res.status(503).json({ error: 'WhatsApp not connected' });
       return;
     }
 
     res.json({ status: 'started', limit, message: 'Fetching chat history...' });
-    
+
     void (async () => {
       try {
         const results = await (client as any).getAllChatsWithHistory(limit);
         console.log('History sync complete: ' + results.length + ' chats');
       } catch (e) {
-        console.error('History sync error: ' + e);
+        console.error('History sync error: ' + String(e));
       }
     })();
   });
@@ -204,7 +219,7 @@ export function createRouter(
   router.get('/history/:chatId', (req: Request, res: Response): void => {
     const chatId = req.params.chatId;
     const limit = parseInt((req.query as any).limit || '100', 10);
-    
+
     void (async () => {
       try {
         const messages = await (client as any).fetchChatHistory(chatId, limit);
@@ -233,7 +248,6 @@ export function createRouter(
       }
     })();
   });
-
 
   // Get authenticated account info
   router.get('/me', auth, (req: AuthenticatedRequest, res: Response): void => {
@@ -284,48 +298,65 @@ export function createRouter(
   });
 
   // Refresh group metadata and Signal sender-key/session state before a group send.
-  router.post('/groups/:id/session/repair', auth, (req: AuthenticatedRequest, res: Response): void => {
-    void (async () => {
-      try {
-        const result = await client.refreshGroupSession(req.params.id, {
-          reason: 'manual-api',
-          warmSessions: true,
-          forceSessions: true,
-          clearSenderKeyMemory: true,
-          failOnWarmupError: false,
-          markFailedDevicesAsSenderKeySent: true,
-        });
-        res.json(result);
-      } catch (e) {
-        const failureClass = classifyWhatsAppSendFailure(e);
-        res.status(statusForSendFailure(failureClass)).json({
-          error: String(e),
-          failureClass,
-        });
-      }
-    })();
-  });
+  router.post(
+    '/groups/:id/session/repair',
+    auth,
+    (req: AuthenticatedRequest, res: Response): void => {
+      void (async () => {
+        try {
+          const result = await client.refreshGroupSession(req.params.id, {
+            reason: 'manual-api',
+            warmSessions: true,
+            forceSessions: true,
+            clearSenderKeyMemory: true,
+            failOnWarmupError: false,
+            markFailedDevicesAsSenderKeySent: true,
+          });
+          res.json(result);
+        } catch (e) {
+          const failureClass = classifyWhatsAppSendFailure(e);
+          res.status(statusForSendFailure(failureClass)).json({
+            error: String(e),
+            failureClass,
+          });
+        }
+      })();
+    }
+  );
 
   // Download media from a message
-  router.get('/messages/media/:chatId/:msgId', auth, (req: AuthenticatedRequest, res: Response): void => {
-    void (async () => {
-      try {
-        const media = await client.downloadMedia(req.params.chatId, req.params.msgId);
-        if (!media) { res.status(404).json({ error: 'No media found' }); return; }
-        res.json(media);
-      } catch (e) {
-        res.status(500).json({ error: String(e) });
-      }
-    })();
-  });
+  router.get(
+    '/messages/media/:chatId/:msgId',
+    auth,
+    (req: AuthenticatedRequest, res: Response): void => {
+      void (async () => {
+        try {
+          const media = await client.downloadMedia(req.params.chatId, req.params.msgId);
+          if (!media) {
+            res.status(404).json({ error: 'No media found' });
+            return;
+          }
+          res.json(media);
+        } catch (e) {
+          res.status(500).json({ error: String(e) });
+        }
+      })();
+    }
+  );
 
   // Send file/media
   router.post('/messages/media/send', auth, (req: AuthenticatedRequest, res: Response): void => {
     void (async () => {
       try {
-        if (process.env.ENABLE_SENDING !== 'true') { res.status(403).json({ error: 'Sending disabled' }); return; }
-        const { conversationId, fileUrl, caption } = req.body as any;
-        if (!conversationId || !fileUrl) { res.status(400).json({ error: 'Missing conversationId or fileUrl' }); return; }
+        if (process.env.ENABLE_SENDING !== 'true') {
+          res.status(403).json({ error: 'Sending disabled' });
+          return;
+        }
+        const { conversationId, fileUrl, caption } = req.body;
+        if (!conversationId || !fileUrl) {
+          res.status(400).json({ error: 'Missing conversationId or fileUrl' });
+          return;
+        }
         await client.sendFile(conversationId, fileUrl, caption);
         res.json({ sent: true, sentAt: new Date().toISOString() });
       } catch (e) {
@@ -338,9 +369,15 @@ export function createRouter(
   router.post('/messages/forward', auth, (req: AuthenticatedRequest, res: Response): void => {
     void (async () => {
       try {
-        if (process.env.ENABLE_SENDING !== 'true') { res.status(403).json({ error: 'Sending disabled' }); return; }
-        const { chatId, messageId, toChatId } = req.body as any;
-        if (!chatId || !messageId || !toChatId) { res.status(400).json({ error: 'Missing chatId, messageId, or toChatId' }); return; }
+        if (process.env.ENABLE_SENDING !== 'true') {
+          res.status(403).json({ error: 'Sending disabled' });
+          return;
+        }
+        const { chatId, messageId, toChatId } = req.body;
+        if (!chatId || !messageId || !toChatId) {
+          res.status(400).json({ error: 'Missing chatId, messageId, or toChatId' });
+          return;
+        }
         await client.forwardMessage(chatId, messageId, toChatId);
         res.json({ forwarded: true });
       } catch (e) {
@@ -350,16 +387,20 @@ export function createRouter(
   });
 
   // Delete message
-  router.delete('/messages/:chatId/:msgId', auth, (req: AuthenticatedRequest, res: Response): void => {
-    void (async () => {
-      try {
-        await client.deleteMessage(req.params.chatId, req.params.msgId);
-        res.json({ deleted: true });
-      } catch (e) {
-        res.status(500).json({ error: String(e) });
-      }
-    })();
-  });
+  router.delete(
+    '/messages/:chatId/:msgId',
+    auth,
+    (req: AuthenticatedRequest, res: Response): void => {
+      void (async () => {
+        try {
+          await client.deleteMessage(req.params.chatId, req.params.msgId);
+          res.json({ deleted: true });
+        } catch (e) {
+          res.status(500).json({ error: String(e) });
+        }
+      })();
+    }
+  );
 
   // Mark chat as read
   router.post('/messages/read/:chatId', auth, (req: AuthenticatedRequest, res: Response): void => {

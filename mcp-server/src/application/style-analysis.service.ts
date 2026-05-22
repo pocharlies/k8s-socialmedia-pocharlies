@@ -60,12 +60,7 @@ export class StyleAnalysisService {
   private llamaService: LlamaService;
   private logger: pino.Logger;
 
-  constructor(
-    dbClient: Pool,
-    redisUrl: string,
-    encryptionKey: string,
-    llamaService: LlamaService
-  ) {
+  constructor(dbClient: Pool, redisUrl: string, encryptionKey: string, llamaService: LlamaService) {
     this.dbClient = dbClient;
     this.redis = new Redis(redisUrl);
     this.encryptionKey = Buffer.from(encryptionKey, 'utf-8');

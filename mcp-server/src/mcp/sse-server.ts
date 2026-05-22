@@ -12,14 +12,16 @@ import * as fs from 'fs';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { MCPServer } from './server';
 
-const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://whatsappmcp:whatsappmcp_dev@localhost:5432/whatsappmcp';
+const DATABASE_URL =
+  process.env.DATABASE_URL || 'postgresql://whatsappmcp:whatsappmcp_dev@localhost:5432/whatsappmcp';
 const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
 const REDIS_TLS_CA = process.env.REDIS_TLS_CA;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 const LLM_BASE_URL = process.env.LLM_BASE_URL || '';
 const LLM_CHAT_MODEL = process.env.LLM_CHAT_MODEL || '';
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'dev-encryption-key-change-in-production';
-const CONNECTOR_SHARED_SECRET = process.env.CONNECTOR_SHARED_SECRET || 'dev-secret-change-in-production';
+const CONNECTOR_SHARED_SECRET =
+  process.env.CONNECTOR_SHARED_SECRET || 'dev-secret-change-in-production';
 const CONNECTOR_URL = process.env.CONNECTOR_URL || 'http://whatsapp-connector:3001';
 const SSE_PORT = parseInt(process.env.MCP_SSE_PORT || '3010', 10);
 const AUTH_TOKEN = process.env.MCP_SSE_AUTH_TOKEN || '';
@@ -60,8 +62,14 @@ async function main() {
   console.log('[SSE] Connected to Redis');
 
   const mcpServer = new MCPServer(
-    dbPool, redisClient, OPENAI_API_KEY, ENCRYPTION_KEY, CONNECTOR_SHARED_SECRET, CONNECTOR_URL,
-    LLM_BASE_URL || undefined, LLM_CHAT_MODEL || undefined
+    dbPool,
+    redisClient,
+    OPENAI_API_KEY,
+    ENCRYPTION_KEY,
+    CONNECTOR_SHARED_SECRET,
+    CONNECTOR_URL,
+    LLM_BASE_URL || undefined,
+    LLM_CHAT_MODEL || undefined
   );
 
   const sessions = new Map<string, SessionRecord>();
@@ -138,7 +146,9 @@ async function main() {
       try {
         req.socket.setKeepAlive(true, TCP_KEEPALIVE_MS);
         req.socket.setTimeout(0);
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
 
       // SSE heartbeat: comment lines keep proxies / load balancers from
       // idling the connection out.
@@ -157,13 +167,21 @@ async function main() {
           clearInterval(heartbeat);
           clearTimeout(maxAgeTimer);
           const ageSec = Math.round((Date.now() - createdAt) / 1000);
-          console.log(`[SSE] Session ${transport.sessionId} ${reason} ip=${ip} age=${ageSec}s (${sessions.size} active)`);
+          console.log(
+            `[SSE] Session ${transport.sessionId} ${reason} ip=${ip} age=${ageSec}s (${sessions.size} active)`
+          );
           void transport.close().catch(() => {});
         }
       };
 
       sessions.set(transport.sessionId, {
-        transport, ip, ua, createdAt, heartbeat, maxAgeTimer, cleanup: doCleanup,
+        transport,
+        ip,
+        ua,
+        createdAt,
+        heartbeat,
+        maxAgeTimer,
+        cleanup: doCleanup,
       });
 
       transport.onclose = () => doCleanup('closed');
@@ -172,7 +190,9 @@ async function main() {
       req.on('error', () => doCleanup('req-error'));
       res.on('error', () => doCleanup('res-error'));
 
-      console.log(`[SSE] New session ${transport.sessionId} ip=${ip} ua="${ua}" (${sessions.size} active)`);
+      console.log(
+        `[SSE] New session ${transport.sessionId} ip=${ip} ua="${ua}" (${sessions.size} active)`
+      );
       await mcpServer.getServer().connect(transport);
       return;
     }
@@ -199,7 +219,9 @@ async function main() {
   httpServer.listen(SSE_PORT, '0.0.0.0', () => {
     console.log(`[SSE] MCP SSE Server listening on port ${SSE_PORT}`);
     console.log(`[SSE] Connect: http://localhost:${SSE_PORT}/sse`);
-    console.log(`[SSE] heartbeat=${HEARTBEAT_INTERVAL_MS}ms tcp-keepalive=${TCP_KEEPALIVE_MS}ms max-age=${SESSION_MAX_AGE_MS}ms`);
+    console.log(
+      `[SSE] heartbeat=${HEARTBEAT_INTERVAL_MS}ms tcp-keepalive=${TCP_KEEPALIVE_MS}ms max-age=${SESSION_MAX_AGE_MS}ms`
+    );
   });
 
   const shutdown = async (signal: string) => {

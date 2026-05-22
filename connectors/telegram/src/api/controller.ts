@@ -66,7 +66,9 @@ export function createRouter(client: TelegramClientWrapper, sharedSecret: string
       try {
         const me = await client.getMe();
         res.json(me);
-      } catch (e) { res.status(500).json({ error: String(e) }); }
+      } catch (e) {
+        res.status(500).json({ error: String(e) });
+      }
     })();
   });
 
@@ -99,7 +101,9 @@ export function createRouter(client: TelegramClientWrapper, sharedSecret: string
       try {
         const chats = await client.getUnreadChats();
         res.json({ chats });
-      } catch (e) { res.status(500).json({ error: String(e) }); }
+      } catch (e) {
+        res.status(500).json({ error: String(e) });
+      }
     })();
   });
 
@@ -111,7 +115,9 @@ export function createRouter(client: TelegramClientWrapper, sharedSecret: string
       try {
         const info = await client.getChatInfo(req.params.id);
         res.json(info);
-      } catch (e) { res.status(500).json({ error: String(e) }); }
+      } catch (e) {
+        res.status(500).json({ error: String(e) });
+      }
     })();
   });
 
@@ -124,7 +130,9 @@ export function createRouter(client: TelegramClientWrapper, sharedSecret: string
         const limit = parseInt(req.query.limit as string) || 100;
         const participants = await client.getParticipants(req.params.id, limit);
         res.json({ participants });
-      } catch (e) { res.status(500).json({ error: String(e) }); }
+      } catch (e) {
+        res.status(500).json({ error: String(e) });
+      }
     })();
   });
 
@@ -159,11 +167,16 @@ export function createRouter(client: TelegramClientWrapper, sharedSecret: string
   router.post('/messages/search', (req: Request, res: Response): void => {
     void (async () => {
       try {
-        const { query, chatId, limit } = req.body as any;
-        if (!query) { res.status(400).json({ error: 'Missing query' }); return; }
+        const { query, chatId, limit } = req.body;
+        if (!query) {
+          res.status(400).json({ error: 'Missing query' });
+          return;
+        }
         const results = await client.searchMessages(query, chatId, limit || 20);
         res.json({ results });
-      } catch (e) { res.status(500).json({ error: String(e) }); }
+      } catch (e) {
+        res.status(500).json({ error: String(e) });
+      }
     })();
   });
 
@@ -173,11 +186,16 @@ export function createRouter(client: TelegramClientWrapper, sharedSecret: string
   router.post('/messages/forward', (req: Request, res: Response): void => {
     void (async () => {
       try {
-        const { fromChatId, messageId, toChatId } = req.body as any;
-        if (!fromChatId || !messageId || !toChatId) { res.status(400).json({ error: 'Missing fields' }); return; }
+        const { fromChatId, messageId, toChatId } = req.body;
+        if (!fromChatId || !messageId || !toChatId) {
+          res.status(400).json({ error: 'Missing fields' });
+          return;
+        }
         await client.forwardMessage(fromChatId, parseInt(messageId), toChatId);
         res.json({ forwarded: true });
-      } catch (e) { res.status(500).json({ error: String(e) }); }
+      } catch (e) {
+        res.status(500).json({ error: String(e) });
+      }
     })();
   });
 
@@ -187,11 +205,16 @@ export function createRouter(client: TelegramClientWrapper, sharedSecret: string
   router.post('/messages/media/send', (req: Request, res: Response): void => {
     void (async () => {
       try {
-        const { chatId, filePath, caption, voiceNote, videoNote } = req.body as any;
-        if (!chatId || !filePath) { res.status(400).json({ error: 'Missing chatId or filePath' }); return; }
+        const { chatId, filePath, caption, voiceNote, videoNote } = req.body;
+        if (!chatId || !filePath) {
+          res.status(400).json({ error: 'Missing chatId or filePath' });
+          return;
+        }
         await client.sendFile(chatId, filePath, { caption, voiceNote, videoNote });
         res.json({ sent: true });
-      } catch (e) { res.status(500).json({ error: String(e) }); }
+      } catch (e) {
+        res.status(500).json({ error: String(e) });
+      }
     })();
   });
 
@@ -203,7 +226,9 @@ export function createRouter(client: TelegramClientWrapper, sharedSecret: string
       try {
         await client.markAsRead(req.params.chatId);
         res.json({ markedAsRead: true });
-      } catch (e) { res.status(500).json({ error: String(e) }); }
+      } catch (e) {
+        res.status(500).json({ error: String(e) });
+      }
     })();
   });
 
@@ -214,9 +239,14 @@ export function createRouter(client: TelegramClientWrapper, sharedSecret: string
     void (async () => {
       try {
         const buffer = await client.downloadMedia(req.params.chatId, parseInt(req.params.msgId));
-        if (!buffer) { res.status(404).json({ error: 'No media' }); return; }
+        if (!buffer) {
+          res.status(404).json({ error: 'No media' });
+          return;
+        }
         res.json({ data: buffer.toString('base64'), size: buffer.length });
-      } catch (e) { res.status(500).json({ error: String(e) }); }
+      } catch (e) {
+        res.status(500).json({ error: String(e) });
+      }
     })();
   });
 
@@ -266,7 +296,9 @@ export function createRouter(client: TelegramClientWrapper, sharedSecret: string
       try {
         await client.deleteMessage(req.params.chatId, parseInt(req.params.msgId));
         res.json({ deleted: true });
-      } catch (e) { res.status(500).json({ error: String(e) }); }
+      } catch (e) {
+        res.status(500).json({ error: String(e) });
+      }
     })();
   });
 

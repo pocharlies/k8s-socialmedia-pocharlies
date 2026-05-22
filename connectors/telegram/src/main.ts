@@ -86,35 +86,54 @@ async function main() {
   // Connect to Telegram
 
   // --- Public API endpoints (no auth, for brain/dashboard) ---
-  app.get("/api/public/dialogs", async (_req, res) => {
+  app.get('/api/public/dialogs', async (_req, res) => {
     try {
-      if (!client.isClientConnected()) { res.status(503).json({ error: "Not connected" }); return; }
+      if (!client.isClientConnected()) {
+        res.status(503).json({ error: 'Not connected' });
+        return;
+      }
       const dialogs = await client.getDialogs();
       res.json({ dialogs });
-    } catch (e) { res.status(500).json({ error: String(e) }); }
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
   });
 
-  app.get("/api/public/messages/:chatId", async (req, res) => {
+  app.get('/api/public/messages/:chatId', async (req, res) => {
     try {
-      if (!client.isClientConnected()) { res.status(503).json({ error: "Not connected" }); return; }
+      if (!client.isClientConnected()) {
+        res.status(503).json({ error: 'Not connected' });
+        return;
+      }
       const limit = parseInt(req.query.limit as string) || 50;
       const messages = await client.getMessages(req.params.chatId, limit);
       res.json({ messages });
-    } catch (e) { res.status(500).json({ error: String(e) }); }
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
   });
 
-  app.post("/api/public/send/:chatId", async (req, res) => {
+  app.post('/api/public/send/:chatId', async (req, res) => {
     try {
-      if (!client.isClientConnected()) { res.status(503).json({ error: "Not connected" }); return; }
+      if (!client.isClientConnected()) {
+        res.status(503).json({ error: 'Not connected' });
+        return;
+      }
       const { text, topicId } = req.body;
-      if (!text) { res.status(400).json({ error: "Missing text" }); return; }
+      if (!text) {
+        res.status(400).json({ error: 'Missing text' });
+        return;
+      }
       const tid = topicId !== undefined && topicId !== null ? Number(topicId) : undefined;
       if (tid !== undefined && (!Number.isInteger(tid) || tid <= 0)) {
-        res.status(400).json({ error: "topicId must be a positive integer" }); return;
+        res.status(400).json({ error: 'topicId must be a positive integer' });
+        return;
       }
       await client.sendMessage(req.params.chatId, text, tid);
       res.json({ success: true });
-    } catch (e) { res.status(500).json({ error: String(e) }); }
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
   });
 
   await client.connect();
@@ -134,7 +153,6 @@ async function main() {
     process.exit(0);
   });
 }
-
 
 main().catch(error => {
   console.error('Fatal error:', error);

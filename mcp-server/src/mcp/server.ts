@@ -66,7 +66,13 @@ export class MCPServer {
       llmBaseUrl,
       llmModel
     );
-    this.draftService = new DraftService(openaiApiKey, dbClient, encryptionKey, llmBaseUrl, llmModel);
+    this.draftService = new DraftService(
+      openaiApiKey,
+      dbClient,
+      encryptionKey,
+      llmBaseUrl,
+      llmModel
+    );
 
     this.connectorUrl = _connectorUrl || 'http://whatsapp-connector:3001';
     this.telegramUrl = process.env.TELEGRAM_CONNECTOR_URL || 'http://telegram-connector:3002';
@@ -119,14 +125,21 @@ export class MCPServer {
           },
           {
             name: 'whatsapp_get_messages',
-            description: 'Get paginated WhatsApp messages for a conversation, including old imported history',
+            description:
+              'Get paginated WhatsApp messages for a conversation, including old imported history',
             inputSchema: {
               type: 'object',
               properties: {
                 chatId: { type: 'string', description: 'Conversation ID' },
                 limit: { type: 'integer', default: 100, maximum: 500 },
-                before: { type: 'string', description: 'Return messages before this ISO timestamp or message id' },
-                after: { type: 'string', description: 'Return messages after this ISO timestamp or message id' },
+                before: {
+                  type: 'string',
+                  description: 'Return messages before this ISO timestamp or message id',
+                },
+                after: {
+                  type: 'string',
+                  description: 'Return messages after this ISO timestamp or message id',
+                },
                 order: { type: 'string', enum: ['asc', 'desc'], default: 'desc' },
                 includeMetadata: { type: 'boolean', default: false },
                 includeAttachments: { type: 'boolean', default: true },
@@ -464,7 +477,8 @@ export class MCPServer {
           },
           {
             name: 'whatsapp_repair_group_session',
-            description: 'Refresh WhatsApp group metadata and Signal session state before sending to a group',
+            description:
+              'Refresh WhatsApp group metadata and Signal session state before sending to a group',
             inputSchema: {
               type: 'object',
               properties: {
@@ -486,7 +500,8 @@ export class MCPServer {
           },
           {
             name: 'messaging_status',
-            description: 'Check health status of all messaging connectors (WhatsApp, Telegram, Instagram)',
+            description:
+              'Check health status of all messaging connectors (WhatsApp, Telegram, Instagram)',
             inputSchema: { type: 'object', properties: {} },
           },
           {
@@ -611,8 +626,16 @@ export class MCPServer {
             inputSchema: {
               type: 'object',
               properties: {
-                limit: { type: 'integer', default: 200, description: 'Max dialogs to scan (1-500)' },
-                only_with_unread: { type: 'boolean', default: true, description: 'If false, also return read dialogs (with unread_count=0)' },
+                limit: {
+                  type: 'integer',
+                  default: 200,
+                  description: 'Max dialogs to scan (1-500)',
+                },
+                only_with_unread: {
+                  type: 'boolean',
+                  default: true,
+                  description: 'If false, also return read dialogs (with unread_count=0)',
+                },
               },
             },
           },
@@ -640,11 +663,16 @@ export class MCPServer {
           },
           {
             name: 'instagram_get_profile',
-            description: 'Get Instagram account profile (followers, bio, media count). Available accounts: skirmshop, barbelpapis',
+            description:
+              'Get Instagram account profile (followers, bio, media count). Available accounts: skirmshop, barbelpapis',
             inputSchema: {
               type: 'object',
               properties: {
-                account: { type: 'string', description: 'Account name: skirmshop or barbelpapis', enum: ['skirmshop', 'barbelpapis'] },
+                account: {
+                  type: 'string',
+                  description: 'Account name: skirmshop or barbelpapis',
+                  enum: ['skirmshop', 'barbelpapis'],
+                },
               },
               required: ['account'],
             },
@@ -668,7 +696,7 @@ export class MCPServer {
               type: 'object',
               properties: {
                 account: { type: 'string', enum: ['skirmshop', 'barbelpapis'] },
-                mediaId: { type: 'string', description: 'Media/post ID'},
+                mediaId: { type: 'string', description: 'Media/post ID' },
               },
               required: ['account', 'mediaId'],
             },
@@ -680,8 +708,8 @@ export class MCPServer {
               type: 'object',
               properties: {
                 account: { type: 'string', enum: ['skirmshop', 'barbelpapis'] },
-                commentId: { type: 'string', description: 'Comment ID to reply to'},
-                message: { type: 'string', description: 'Reply text'},
+                commentId: { type: 'string', description: 'Comment ID to reply to' },
+                message: { type: 'string', description: 'Reply text' },
               },
               required: ['account', 'commentId', 'message'],
             },
@@ -705,8 +733,8 @@ export class MCPServer {
               type: 'object',
               properties: {
                 account: { type: 'string', enum: ['skirmshop', 'barbelpapis'] },
-                recipientId: { type: 'string', description: 'Instagram user ID of the recipient'},
-                message: { type: 'string', description: 'Message text'},
+                recipientId: { type: 'string', description: 'Instagram user ID of the recipient' },
+                message: { type: 'string', description: 'Message text' },
               },
               required: ['account', 'recipientId', 'message'],
             },
@@ -729,21 +757,22 @@ export class MCPServer {
               type: 'object',
               properties: {
                 account: { type: 'string', enum: ['skirmshop', 'barbelpapis'] },
-                imageUrl: { type: 'string', description: 'Public URL of the image/video'},
-                caption: { type: 'string', description: 'Post caption'},
-                mediaType: { type: 'string', enum: ['IMAGE', 'VIDEO'], default: 'IMAGE'},
+                imageUrl: { type: 'string', description: 'Public URL of the image/video' },
+                caption: { type: 'string', description: 'Post caption' },
+                mediaType: { type: 'string', enum: ['IMAGE', 'VIDEO'], default: 'IMAGE' },
               },
               required: ['account', 'imageUrl', 'caption'],
             },
           },
           {
             name: 'instagram_media_insights',
-            description: 'Get insights/metrics for an Instagram post (impressions, reach, engagement)',
+            description:
+              'Get insights/metrics for an Instagram post (impressions, reach, engagement)',
             inputSchema: {
               type: 'object',
               properties: {
                 account: { type: 'string', enum: ['skirmshop', 'barbelpapis'] },
-                mediaId: { type: 'string', description: 'Media/post ID'},
+                mediaId: { type: 'string', description: 'Media/post ID' },
               },
               required: ['account', 'mediaId'],
             },
@@ -755,7 +784,11 @@ export class MCPServer {
               type: 'object',
               properties: {
                 account: { type: 'string', enum: ['skirmshop', 'barbelpapis'] },
-                items: { type: 'array', items: { type: 'string' }, description: 'Public URLs of media (2-10). MP4/MOV detected as video.' },
+                items: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'Public URLs of media (2-10). MP4/MOV detected as video.',
+                },
                 caption: { type: 'string' },
               },
               required: ['account', 'items'],
@@ -828,12 +861,17 @@ export class MCPServer {
           },
           {
             name: 'instagram_get_account_insights',
-            description: 'Get account-level Instagram insights (reach, profile_views, website_clicks, etc.)',
+            description:
+              'Get account-level Instagram insights (reach, profile_views, website_clicks, etc.)',
             inputSchema: {
               type: 'object',
               properties: {
                 account: { type: 'string', enum: ['skirmshop', 'barbelpapis'] },
-                metrics: { type: 'array', items: { type: 'string' }, description: 'Metric names; defaults to reach,profile_views,website_clicks' },
+                metrics: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'Metric names; defaults to reach,profile_views,website_clicks',
+                },
                 period: { type: 'string', enum: ['day', 'week', 'days_28'], default: 'day' },
               },
               required: ['account'],
@@ -841,7 +879,8 @@ export class MCPServer {
           },
           {
             name: 'instagram_get_account_pages',
-            description: 'List Facebook pages with linked IG Business accounts (requires Facebook Login EAA token)',
+            description:
+              'List Facebook pages with linked IG Business accounts (requires Facebook Login EAA token)',
             inputSchema: {
               type: 'object',
               properties: {
@@ -863,7 +902,8 @@ export class MCPServer {
           },
           {
             name: 'instagram_get_hashtag_media',
-            description: 'Get top or recent media for an Instagram hashtag id (use instagram_search_hashtag first to resolve the id)',
+            description:
+              'Get top or recent media for an Instagram hashtag id (use instagram_search_hashtag first to resolve the id)',
             inputSchema: {
               type: 'object',
               properties: {
@@ -882,14 +922,18 @@ export class MCPServer {
               type: 'object',
               properties: {
                 account: { type: 'string', enum: ['skirmshop', 'barbelpapis'] },
-                hashtag: { type: 'string', description: 'Hashtag name e.g. "airsoft" or "#airsoft"' },
+                hashtag: {
+                  type: 'string',
+                  description: 'Hashtag name e.g. "airsoft" or "#airsoft"',
+                },
               },
               required: ['account', 'hashtag'],
             },
           },
           {
             name: 'instagram_business_discovery',
-            description: 'Look up public profile info for another IG business account by username (requires Facebook Login EAA token)',
+            description:
+              'Look up public profile info for another IG business account by username (requires Facebook Login EAA token)',
             inputSchema: {
               type: 'object',
               properties: {
@@ -901,7 +945,8 @@ export class MCPServer {
           },
           {
             name: 'instagram_get_mentions',
-            description: 'Get media where the configured Instagram account has been tagged/mentioned',
+            description:
+              'Get media where the configured Instagram account has been tagged/mentioned',
             inputSchema: {
               type: 'object',
               properties: {
@@ -1137,10 +1182,9 @@ export class MCPServer {
 
   private async handleGetChat(args: { chatId: string }) {
     // conversations.id IS the wa_chat_id
-    const convResult = await this.dbClient.query(
-      `SELECT * FROM conversations WHERE id = $1`,
-      [args.chatId]
-    );
+    const convResult = await this.dbClient.query(`SELECT * FROM conversations WHERE id = $1`, [
+      args.chatId,
+    ]);
 
     let conversation;
     if (convResult.rows.length > 0) {
@@ -1720,7 +1764,6 @@ export class MCPServer {
     }
   }
 
-
   private async handleSendMessage(args: { chatId: string; text: string }) {
     if (process.env.ENABLE_SENDING !== 'true') {
       throw new McpError(ErrorCode.InvalidRequest, 'Sending is disabled (ENABLE_SENDING != true)');
@@ -1755,20 +1798,28 @@ export class MCPServer {
         const errorPayload = await this.readConnectorError(response);
         const failure = errorPayload.failureClass ? ` (${errorPayload.failureClass})` : '';
         const actionable = errorPayload.actionable ? ` - ${errorPayload.actionable}` : '';
-        throw new Error(`Connector returned ${response.status}${failure}: ${errorPayload.error || response.statusText}${actionable}`);
+        throw new Error(
+          `Connector returned ${response.status}${failure}: ${errorPayload.error || response.statusText}${actionable}`
+        );
       }
 
-      const result = await response.json() as Record<string, unknown>;
+      const result = (await response.json()) as Record<string, unknown>;
       return {
-        content: [{
-          type: 'text',
-          text: JSON.stringify({
-            message: 'Message sent',
-            messageId: result.messageId || null,
-            sentAt: result.sentAt || new Date().toISOString(),
-            chatId: args.chatId,
-          }, null, 2),
-        }],
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(
+              {
+                message: 'Message sent',
+                messageId: result.messageId || null,
+                sentAt: result.sentAt || new Date().toISOString(),
+                chatId: args.chatId,
+              },
+              null,
+              2
+            ),
+          },
+        ],
       };
     } catch (error) {
       this.logger.error(`Error sending message: ${error}`);
@@ -2040,13 +2091,22 @@ export class MCPServer {
     };
   }
 
-
   private async handleTelegramSendMessage(args: { chatId: string; text: string }) {
-    const data = await this.connectorCall(this.telegramUrl, 'POST', `/api/v1/messages/${args.chatId}`, { text: args.text });
+    const data = await this.connectorCall(
+      this.telegramUrl,
+      'POST',
+      `/api/v1/messages/${args.chatId}`,
+      { text: args.text }
+    );
     return this.jsonResponse(data);
   }
 
-  private async handleTelegramSendFile(args: { chatId: string; filePath: string; caption?: string; voiceNote?: boolean }) {
+  private async handleTelegramSendFile(args: {
+    chatId: string;
+    filePath: string;
+    caption?: string;
+    voiceNote?: boolean;
+  }) {
     const data = await this.connectorCall(this.telegramUrl, 'POST', '/api/v1/messages/media/send', {
       chatId: args.chatId,
       filePath: args.filePath,
@@ -2075,9 +2135,17 @@ export class MCPServer {
     return null;
   }
 
-  private async handleTelegramGetMessages(args: { chatId: string; limit?: number; offsetId?: number }) {
+  private async handleTelegramGetMessages(args: {
+    chatId: string;
+    limit?: number;
+    offsetId?: number;
+  }) {
     const id = await this.resolveTelegramChatId(args.chatId);
-    if (!id) throw new McpError(ErrorCode.InvalidParams, `Could not resolve Telegram chatId '${args.chatId}'. Use 'tg_<numeric>' or numeric id.`);
+    if (!id)
+      throw new McpError(
+        ErrorCode.InvalidParams,
+        `Could not resolve Telegram chatId '${args.chatId}'. Use 'tg_<numeric>' or numeric id.`
+      );
     const limit = Math.min(args.limit ?? 50, 500);
     const params: any[] = [id, limit];
     let where = `conversation_id = $1`;
@@ -2115,7 +2183,11 @@ export class MCPServer {
     });
   }
 
-  private async handleTelegramForwardMessage(args: { fromChatId: string; messageId: string; toChatId: string }) {
+  private async handleTelegramForwardMessage(args: {
+    fromChatId: string;
+    messageId: string;
+    toChatId: string;
+  }) {
     const data = await this.connectorCall(this.telegramUrl, 'POST', '/api/v1/messages/forward', {
       fromChatId: args.fromChatId,
       messageId: args.messageId,
@@ -2125,12 +2197,20 @@ export class MCPServer {
   }
 
   private async handleTelegramDeleteMessage(args: { chatId: string; messageId: string }) {
-    const data = await this.connectorCall(this.telegramUrl, 'DELETE', `/api/v1/messages/${args.chatId}/${args.messageId}`);
+    const data = await this.connectorCall(
+      this.telegramUrl,
+      'DELETE',
+      `/api/v1/messages/${args.chatId}/${args.messageId}`
+    );
     return this.jsonResponse(data);
   }
 
   private async handleTelegramMarkAsRead(args: { chatId: string }) {
-    const data = await this.connectorCall(this.telegramUrl, 'POST', `/api/v1/messages/read/${args.chatId}`);
+    const data = await this.connectorCall(
+      this.telegramUrl,
+      'POST',
+      `/api/v1/messages/read/${args.chatId}`
+    );
     return this.jsonResponse(data);
   }
 
@@ -2188,7 +2268,11 @@ export class MCPServer {
   }
 
   private async handleTelegramDownloadMedia(args: { chatId: string; messageId: string }) {
-    const data = await this.connectorCall(this.telegramUrl, 'GET', `/api/v1/messages/media/${args.chatId}/${args.messageId}`);
+    const data = await this.connectorCall(
+      this.telegramUrl,
+      'GET',
+      `/api/v1/messages/media/${args.chatId}/${args.messageId}`
+    );
     return this.jsonResponse(data);
   }
 
@@ -2202,7 +2286,13 @@ export class MCPServer {
     return this.jsonResponse(data);
   }
 
-  private async connectorCall(baseUrl: string, method: string, path: string, body?: any, timeoutMs = 15000): Promise<any> {
+  private async connectorCall(
+    baseUrl: string,
+    method: string,
+    path: string,
+    body?: any,
+    timeoutMs = 15000
+  ): Promise<any> {
     const timestamp = Math.floor(Date.now() / 1000);
     const payload = body || {};
     const signature = generateHMACSignature(payload, timestamp, this.connectorSecret);
@@ -2229,28 +2319,54 @@ export class MCPServer {
   }
 
   private async handleDownloadMedia(args: { chatId: string; messageId: string }) {
-    const data = await this.connectorCall(this.connectorUrl, 'GET', `/api/v1/messages/media/${args.chatId}/${args.messageId}`);
+    const data = await this.connectorCall(
+      this.connectorUrl,
+      'GET',
+      `/api/v1/messages/media/${args.chatId}/${args.messageId}`
+    );
     return this.jsonResponse(data);
   }
 
-  private async handleSendFile(args: { conversationId: string; fileUrl: string; caption?: string }) {
+  private async handleSendFile(args: {
+    conversationId: string;
+    fileUrl: string;
+    caption?: string;
+  }) {
     if (process.env.ENABLE_SENDING !== 'true') {
       throw new McpError(ErrorCode.InvalidRequest, 'Sending disabled');
     }
-    const data = await this.connectorCall(this.connectorUrl, 'POST', '/api/v1/messages/media/send', args);
+    const data = await this.connectorCall(
+      this.connectorUrl,
+      'POST',
+      '/api/v1/messages/media/send',
+      args
+    );
     return this.jsonResponse(data);
   }
 
-  private async handleForwardMessage(args: { chatId: string; messageId: string; toChatId: string }) {
+  private async handleForwardMessage(args: {
+    chatId: string;
+    messageId: string;
+    toChatId: string;
+  }) {
     if (process.env.ENABLE_SENDING !== 'true') {
       throw new McpError(ErrorCode.InvalidRequest, 'Sending disabled');
     }
-    const data = await this.connectorCall(this.connectorUrl, 'POST', '/api/v1/messages/forward', args);
+    const data = await this.connectorCall(
+      this.connectorUrl,
+      'POST',
+      '/api/v1/messages/forward',
+      args
+    );
     return this.jsonResponse(data);
   }
 
   private async handleDeleteMessage(args: { chatId: string; messageId: string }) {
-    const data = await this.connectorCall(this.connectorUrl, 'DELETE', `/api/v1/messages/${args.chatId}/${args.messageId}`);
+    const data = await this.connectorCall(
+      this.connectorUrl,
+      'DELETE',
+      `/api/v1/messages/${args.chatId}/${args.messageId}`
+    );
     return this.jsonResponse(data);
   }
 
@@ -2265,10 +2381,16 @@ export class MCPServer {
     // hang the SSE client; surface a clear error if the connector is too slow
     // (the user can fall back to list_conversations / get_user_messages).
     try {
-      const data = await this.connectorCall(this.connectorUrl, 'GET', '/api/v1/chats/unread', undefined, 8000);
+      const data = await this.connectorCall(
+        this.connectorUrl,
+        'GET',
+        '/api/v1/chats/unread',
+        undefined,
+        8000
+      );
       return this.jsonResponse(data);
     } catch (e: any) {
-      const reason = e?.name === 'TimeoutError' ? 'timeout after 8s' : (e?.message || String(e));
+      const reason = e?.name === 'TimeoutError' ? 'timeout after 8s' : e?.message || String(e);
       throw new McpError(
         ErrorCode.InternalError,
         `get_unread_chats failed (${reason}). The whatsapp connector enumerates every chat — try list_conversations(limit=20) or get_user_messages for specific contacts instead.`
@@ -2277,22 +2399,40 @@ export class MCPServer {
   }
 
   private async handleGetGroupInfo(args: { groupId: string }) {
-    const data = await this.connectorCall(this.connectorUrl, 'GET', `/api/v1/groups/${args.groupId}/info`);
+    const data = await this.connectorCall(
+      this.connectorUrl,
+      'GET',
+      `/api/v1/groups/${args.groupId}/info`
+    );
     return this.jsonResponse(data);
   }
 
   private async handleGetGroupParticipants(args: { groupId: string }) {
-    const data = await this.connectorCall(this.connectorUrl, 'GET', `/api/v1/groups/${args.groupId}/participants`);
+    const data = await this.connectorCall(
+      this.connectorUrl,
+      'GET',
+      `/api/v1/groups/${args.groupId}/participants`
+    );
     return this.jsonResponse(data);
   }
 
   private async handleRepairGroupSession(args: { groupId: string }) {
-    const data = await this.connectorCall(this.connectorUrl, 'POST', `/api/v1/groups/${args.groupId}/session/repair`, {}, 120000);
+    const data = await this.connectorCall(
+      this.connectorUrl,
+      'POST',
+      `/api/v1/groups/${args.groupId}/session/repair`,
+      {},
+      120000
+    );
     return this.jsonResponse(data);
   }
 
   private async handleMarkAsRead(args: { chatId: string }) {
-    const data = await this.connectorCall(this.connectorUrl, 'POST', `/api/v1/messages/read/${args.chatId}`);
+    const data = await this.connectorCall(
+      this.connectorUrl,
+      'POST',
+      `/api/v1/messages/read/${args.chatId}`
+    );
     return this.jsonResponse(data);
   }
 
@@ -2300,18 +2440,24 @@ export class MCPServer {
     const targets = [
       ['whatsapp', this.connectorUrl, '/api/v1/health'],
       ['telegram', this.telegramUrl, '/health'],
-      ['instagram', process.env.INSTAGRAM_CONNECTOR_URL || 'http://instagram-connector:3003', '/health'],
+      [
+        'instagram',
+        process.env.INSTAGRAM_CONNECTOR_URL || 'http://instagram-connector:3003',
+        '/health',
+      ],
     ] as const;
-    const checks = await Promise.all(targets.map(async ([name, url, endpoint]) => {
-      try {
-        const resp = await fetch(`${url}${endpoint}`, { signal: AbortSignal.timeout(3000) });
-        const body = await resp.json();
-        return [name, body] as const;
-      } catch (e: any) {
-        const reason = e?.name === 'TimeoutError' ? 'timeout after 3s' : (e?.message || String(e));
-        return [name, { status: 'unreachable', error: reason }] as const;
-      }
-    }));
+    const checks = await Promise.all(
+      targets.map(async ([name, url, endpoint]) => {
+        try {
+          const resp = await fetch(`${url}${endpoint}`, { signal: AbortSignal.timeout(3000) });
+          const body = await resp.json();
+          return [name, body] as const;
+        } catch (e: any) {
+          const reason = e?.name === 'TimeoutError' ? 'timeout after 3s' : e?.message || String(e);
+          return [name, { status: 'unreachable', error: reason }] as const;
+        }
+      })
+    );
     const results: any = {};
     for (const [name, body] of checks) results[name] = body;
     return this.jsonResponse(results);
@@ -2323,7 +2469,11 @@ export class MCPServer {
     let where = `platform = 'telegram' AND content ILIKE $1`;
     if (args.chatId) {
       const id = await this.resolveTelegramChatId(args.chatId);
-      if (!id) throw new McpError(ErrorCode.InvalidParams, `Could not resolve Telegram chatId '${args.chatId}'`);
+      if (!id)
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          `Could not resolve Telegram chatId '${args.chatId}'`
+        );
       params.push(id);
       where += ` AND conversation_id = $3`;
     }
@@ -2350,14 +2500,19 @@ export class MCPServer {
 
   private async handleTelegramChatInfo(args: { chatId: string }) {
     const id = await this.resolveTelegramChatId(args.chatId);
-    if (!id) throw new McpError(ErrorCode.InvalidParams, `Could not resolve Telegram chatId '${args.chatId}'`);
+    if (!id)
+      throw new McpError(
+        ErrorCode.InvalidParams,
+        `Could not resolve Telegram chatId '${args.chatId}'`
+      );
     const result = await this.dbClient.query(
       `SELECT id, name, type, is_group, participant_count, last_message_at, metadata,
               (SELECT count(*)::int FROM messages WHERE conversation_id = c.id) AS message_count
          FROM conversations c WHERE id = $1`,
       [id]
     );
-    if (!result.rows.length) throw new McpError(ErrorCode.InvalidParams, `Telegram chat '${id}' not found in DB`);
+    if (!result.rows.length)
+      throw new McpError(ErrorCode.InvalidParams, `Telegram chat '${id}' not found in DB`);
     const c = result.rows[0];
     return this.jsonResponse({
       source: 'db',
@@ -2374,7 +2529,11 @@ export class MCPServer {
 
   private async handleTelegramParticipants(args: { chatId: string; limit?: number }) {
     const id = await this.resolveTelegramChatId(args.chatId);
-    if (!id) throw new McpError(ErrorCode.InvalidParams, `Could not resolve Telegram chatId '${args.chatId}'`);
+    if (!id)
+      throw new McpError(
+        ErrorCode.InvalidParams,
+        `Could not resolve Telegram chatId '${args.chatId}'`
+      );
     const limit = Math.min(args.limit ?? 100, 500);
     const result = await this.dbClient.query(
       `SELECT cp.participant_id, cp.role, p.name, p.push_name, p.phone, p.metadata
@@ -2398,7 +2557,6 @@ export class MCPServer {
     });
   }
 
-
   // === Instagram handlers ===
 
   private async instagramCall(method: string, path: string, body?: any, timeoutMs = 30000) {
@@ -2420,27 +2578,51 @@ export class MCPServer {
   }
 
   private async handleInstagramGetMedia(args: { account: string; limit?: number }) {
-    const data = await this.instagramCall('GET', `/api/v1/${args.account}/media?limit=${args.limit || 25}`);
+    const data = await this.instagramCall(
+      'GET',
+      `/api/v1/${args.account}/media?limit=${args.limit || 25}`
+    );
     return this.jsonResponse(data);
   }
 
   private async handleInstagramGetComments(args: { account: string; mediaId: string }) {
-    const data = await this.instagramCall('GET', `/api/v1/${args.account}/media/${args.mediaId}/comments`);
+    const data = await this.instagramCall(
+      'GET',
+      `/api/v1/${args.account}/media/${args.mediaId}/comments`
+    );
     return this.jsonResponse(data);
   }
 
-  private async handleInstagramReplyComment(args: { account: string; commentId: string; message: string }) {
-    const data = await this.instagramCall('POST', `/api/v1/${args.account}/comments/${args.commentId}/reply`, { message: args.message });
+  private async handleInstagramReplyComment(args: {
+    account: string;
+    commentId: string;
+    message: string;
+  }) {
+    const data = await this.instagramCall(
+      'POST',
+      `/api/v1/${args.account}/comments/${args.commentId}/reply`,
+      { message: args.message }
+    );
     return this.jsonResponse(data);
   }
 
   private async handleInstagramGetConversations(args: { account: string; limit?: number }) {
-    const data = await this.instagramCall('GET', `/api/v1/${args.account}/conversations?limit=${args.limit || 20}`);
+    const data = await this.instagramCall(
+      'GET',
+      `/api/v1/${args.account}/conversations?limit=${args.limit || 20}`
+    );
     return this.jsonResponse(data);
   }
 
-  private async handleInstagramSendDm(args: { account: string; recipientId: string; message: string }) {
-    const data = await this.instagramCall('POST', `/api/v1/${args.account}/messages/send`, { recipient_id: args.recipientId, message: args.message });
+  private async handleInstagramSendDm(args: {
+    account: string;
+    recipientId: string;
+    message: string;
+  }) {
+    const data = await this.instagramCall('POST', `/api/v1/${args.account}/messages/send`, {
+      recipient_id: args.recipientId,
+      message: args.message,
+    });
     return this.jsonResponse(data);
   }
 
@@ -2449,52 +2631,118 @@ export class MCPServer {
     return this.jsonResponse(data);
   }
 
-  private async handleInstagramPublish(args: { account: string; imageUrl: string; caption: string; mediaType?: string }) {
-    const data = await this.instagramCall('POST', `/api/v1/${args.account}/publish`, { image_url: args.imageUrl, caption: args.caption, media_type: args.mediaType || 'IMAGE' });
+  private async handleInstagramPublish(args: {
+    account: string;
+    imageUrl: string;
+    caption: string;
+    mediaType?: string;
+  }) {
+    const data = await this.instagramCall('POST', `/api/v1/${args.account}/publish`, {
+      image_url: args.imageUrl,
+      caption: args.caption,
+      media_type: args.mediaType || 'IMAGE',
+    });
     return this.jsonResponse(data);
   }
 
   private async handleInstagramMediaInsights(args: { account: string; mediaId: string }) {
-    const data = await this.instagramCall('GET', `/api/v1/${args.account}/media/${args.mediaId}/insights`);
+    const data = await this.instagramCall(
+      'GET',
+      `/api/v1/${args.account}/media/${args.mediaId}/insights`
+    );
     return this.jsonResponse(data);
   }
 
-  private async handleInstagramPublishCarousel(args: { account: string; items: string[]; caption?: string }) {
-    const data = await this.instagramCall('POST', `/api/v1/${args.account}/publish/carousel`, { items: args.items, caption: args.caption }, 120000);
+  private async handleInstagramPublishCarousel(args: {
+    account: string;
+    items: string[];
+    caption?: string;
+  }) {
+    const data = await this.instagramCall(
+      'POST',
+      `/api/v1/${args.account}/publish/carousel`,
+      { items: args.items, caption: args.caption },
+      120000
+    );
     return this.jsonResponse(data);
   }
 
-  private async handleInstagramPublishReel(args: { account: string; videoUrl: string; caption?: string; shareToFeed?: boolean }) {
-    const data = await this.instagramCall('POST', `/api/v1/${args.account}/publish/reel`, { video_url: args.videoUrl, caption: args.caption, share_to_feed: args.shareToFeed ?? true }, 120000);
+  private async handleInstagramPublishReel(args: {
+    account: string;
+    videoUrl: string;
+    caption?: string;
+    shareToFeed?: boolean;
+  }) {
+    const data = await this.instagramCall(
+      'POST',
+      `/api/v1/${args.account}/publish/reel`,
+      { video_url: args.videoUrl, caption: args.caption, share_to_feed: args.shareToFeed ?? true },
+      120000
+    );
     return this.jsonResponse(data);
   }
 
-  private async handleInstagramPublishStory(args: { account: string; imageUrl?: string; videoUrl?: string }) {
-    const data = await this.instagramCall('POST', `/api/v1/${args.account}/publish/story`, { image_url: args.imageUrl, video_url: args.videoUrl }, 120000);
+  private async handleInstagramPublishStory(args: {
+    account: string;
+    imageUrl?: string;
+    videoUrl?: string;
+  }) {
+    const data = await this.instagramCall(
+      'POST',
+      `/api/v1/${args.account}/publish/story`,
+      { image_url: args.imageUrl, video_url: args.videoUrl },
+      120000
+    );
     return this.jsonResponse(data);
   }
 
-  private async handleInstagramPostComment(args: { account: string; mediaId: string; message: string }) {
-    const data = await this.instagramCall('POST', `/api/v1/${args.account}/media/${args.mediaId}/comments`, { message: args.message });
+  private async handleInstagramPostComment(args: {
+    account: string;
+    mediaId: string;
+    message: string;
+  }) {
+    const data = await this.instagramCall(
+      'POST',
+      `/api/v1/${args.account}/media/${args.mediaId}/comments`,
+      { message: args.message }
+    );
     return this.jsonResponse(data);
   }
 
-  private async handleInstagramHideComment(args: { account: string; commentId: string; hide?: boolean }) {
-    const data = await this.instagramCall('POST', `/api/v1/${args.account}/comments/${args.commentId}/hide`, { hide: args.hide ?? true });
+  private async handleInstagramHideComment(args: {
+    account: string;
+    commentId: string;
+    hide?: boolean;
+  }) {
+    const data = await this.instagramCall(
+      'POST',
+      `/api/v1/${args.account}/comments/${args.commentId}/hide`,
+      { hide: args.hide ?? true }
+    );
     return this.jsonResponse(data);
   }
 
   private async handleInstagramDeleteComment(args: { account: string; commentId: string }) {
-    const data = await this.instagramCall('DELETE', `/api/v1/${args.account}/comments/${args.commentId}`);
+    const data = await this.instagramCall(
+      'DELETE',
+      `/api/v1/${args.account}/comments/${args.commentId}`
+    );
     return this.jsonResponse(data);
   }
 
-  private async handleInstagramGetAccountInsights(args: { account: string; metrics?: string[]; period?: string }) {
+  private async handleInstagramGetAccountInsights(args: {
+    account: string;
+    metrics?: string[];
+    period?: string;
+  }) {
     const params = new URLSearchParams();
     if (args.metrics?.length) params.set('metrics', args.metrics.join(','));
     if (args.period) params.set('period', args.period);
     const qs = params.toString();
-    const data = await this.instagramCall('GET', `/api/v1/${args.account}/insights${qs ? `?${qs}` : ''}`);
+    const data = await this.instagramCall(
+      'GET',
+      `/api/v1/${args.account}/insights${qs ? `?${qs}` : ''}`
+    );
     return this.jsonResponse(data);
   }
 
@@ -2508,9 +2756,20 @@ export class MCPServer {
     return this.jsonResponse(data);
   }
 
-  private async handleInstagramGetHashtagMedia(args: { account: string; hashtagId: string; mediaType?: 'top' | 'recent'; limit?: number }) {
-    const qs = new URLSearchParams({ media_type: args.mediaType ?? 'top', limit: String(args.limit ?? 25) }).toString();
-    const data = await this.instagramCall('GET', `/api/v1/${args.account}/hashtag/${args.hashtagId}/media?${qs}`);
+  private async handleInstagramGetHashtagMedia(args: {
+    account: string;
+    hashtagId: string;
+    mediaType?: 'top' | 'recent';
+    limit?: number;
+  }) {
+    const qs = new URLSearchParams({
+      media_type: args.mediaType ?? 'top',
+      limit: String(args.limit ?? 25),
+    }).toString();
+    const data = await this.instagramCall(
+      'GET',
+      `/api/v1/${args.account}/hashtag/${args.hashtagId}/media?${qs}`
+    );
     return this.jsonResponse(data);
   }
 
@@ -2522,12 +2781,18 @@ export class MCPServer {
 
   private async handleInstagramBusinessDiscovery(args: { account: string; username: string }) {
     const qs = new URLSearchParams({ username: args.username }).toString();
-    const data = await this.instagramCall('GET', `/api/v1/${args.account}/business-discovery?${qs}`);
+    const data = await this.instagramCall(
+      'GET',
+      `/api/v1/${args.account}/business-discovery?${qs}`
+    );
     return this.jsonResponse(data);
   }
 
   private async handleInstagramGetMentions(args: { account: string; limit?: number }) {
-    const data = await this.instagramCall('GET', `/api/v1/${args.account}/mentions?limit=${args.limit ?? 25}`);
+    const data = await this.instagramCall(
+      'GET',
+      `/api/v1/${args.account}/mentions?limit=${args.limit ?? 25}`
+    );
     return this.jsonResponse(data);
   }
 
@@ -2536,8 +2801,15 @@ export class MCPServer {
     return this.jsonResponse(data);
   }
 
-  private async handleInstagramGetConversationMessages(args: { account: string; conversationId: string; limit?: number }) {
-    const data = await this.instagramCall('GET', `/api/v1/${args.account}/conversations/${args.conversationId}/messages?limit=${args.limit ?? 25}`);
+  private async handleInstagramGetConversationMessages(args: {
+    account: string;
+    conversationId: string;
+    limit?: number;
+  }) {
+    const data = await this.instagramCall(
+      'GET',
+      `/api/v1/${args.account}/conversations/${args.conversationId}/messages?limit=${args.limit ?? 25}`
+    );
     return this.jsonResponse(data);
   }
 

@@ -7,7 +7,10 @@ import {
   EventType,
 } from '@mcp-socialmedia/shared';
 import { MessageIngestionService } from '../../application/message-ingestion.service';
-import { InstagramIngestionService, InstagramEvent } from '../../application/instagram-ingestion.service';
+import {
+  InstagramIngestionService,
+  InstagramEvent,
+} from '../../application/instagram-ingestion.service';
 import pino from 'pino';
 import * as fs from 'fs';
 

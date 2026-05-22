@@ -33,7 +33,13 @@ export class DraftService {
   private readonly MAX_MESSAGE_LENGTH = 4096;
   private llmModel: string;
 
-  constructor(openaiApiKey: string, dbClient: Pool, _encryptionKey: string, llmBaseUrl?: string, llmModel?: string) {
+  constructor(
+    openaiApiKey: string,
+    dbClient: Pool,
+    _encryptionKey: string,
+    llmBaseUrl?: string,
+    llmModel?: string
+  ) {
     this.openai = new OpenAI({
       apiKey: openaiApiKey || 'sk-placeholder',
       ...(llmBaseUrl && { baseURL: llmBaseUrl }),
@@ -66,13 +72,11 @@ export class DraftService {
       [conversationId, lastN]
     );
 
-    return result.rows
-      .reverse()
-      .map(row => ({
-        content: row.content || '',
-        sender: row.sender_wa_id,
-        timestamp: row.wa_timestamp,
-      }));
+    return result.rows.reverse().map(row => ({
+      content: row.content || '',
+      sender: row.sender_wa_id,
+      timestamp: row.wa_timestamp,
+    }));
   }
 
   /**
@@ -162,24 +166,27 @@ Generate a draft reply. Keep it concise and appropriate for WhatsApp messaging.`
 
     try {
       // Generate draft using OpenAI
-      const response = await this.openai.chat.completions.create({
-        model: this.llmModel,
-        messages: [
-          {
-            role: 'system',
-            content:
-              language === 'es'
-                ? 'Eres un asistente que ayuda a redactar respuestas para WhatsApp de manera clara y apropiada.'
-                : 'You are an assistant that helps draft WhatsApp message replies clearly and appropriately.',
-          },
-          {
-            role: 'user',
-            content: prompt,
-          },
-        ],
-        temperature: 0.7,
-        max_tokens: constraints?.maxLength ? Math.min(constraints.maxLength / 4, 500) : 200,
-      }, { timeout: 180_000 });
+      const response = await this.openai.chat.completions.create(
+        {
+          model: this.llmModel,
+          messages: [
+            {
+              role: 'system',
+              content:
+                language === 'es'
+                  ? 'Eres un asistente que ayuda a redactar respuestas para WhatsApp de manera clara y apropiada.'
+                  : 'You are an assistant that helps draft WhatsApp message replies clearly and appropriately.',
+            },
+            {
+              role: 'user',
+              content: prompt,
+            },
+          ],
+          temperature: 0.7,
+          max_tokens: constraints?.maxLength ? Math.min(constraints.maxLength / 4, 500) : 200,
+        },
+        { timeout: 180_000 }
+      );
 
       const draftContent = response.choices[0]?.message?.content || '';
 

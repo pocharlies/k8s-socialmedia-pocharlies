@@ -17,9 +17,7 @@ export class DatabaseRepository {
     avatarUrl: string | null = null
   ): Promise<Conversation> {
     // conversations.id IS the wa_chat_id in this schema
-    const result = await this.client.query(`SELECT * FROM conversations WHERE id = $1`, [
-      waChatId,
-    ]);
+    const result = await this.client.query(`SELECT * FROM conversations WHERE id = $1`, [waChatId]);
 
     if (result.rows.length > 0) {
       const row = result.rows[0];
@@ -111,15 +109,7 @@ export class DatabaseRepository {
       [conversationId, waUserId]
     );
 
-    return new Participant(
-      waUserId,
-      conversationId,
-      waUserId,
-      name,
-      false,
-      new Date(),
-      null
-    );
+    return new Participant(waUserId, conversationId, waUserId, name, false, new Date(), null);
   }
 
   async saveMessage(

@@ -4,7 +4,9 @@
  */
 import pg from 'pg';
 
-const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://whatsappmcp:whatsappmcp_dgx_2026@postgres:5432/whatsappmcp';
+const DATABASE_URL =
+  process.env.DATABASE_URL ||
+  'postgresql://whatsappmcp:whatsappmcp_dgx_2026@postgres:5432/whatsappmcp';
 
 let pool: pg.Pool | null = null;
 
@@ -156,19 +158,30 @@ export async function storeMessage(data: MessageData): Promise<bigint | null> {
   }
 }
 
-export async function storeAttachment(messageId: bigint, attachment: {
-  fileType: string;
-  mimeType?: string;
-  fileName?: string;
-  fileSize?: number;
-  fileUrl?: string;
-  caption?: string;
-}): Promise<void> {
+export async function storeAttachment(
+  messageId: bigint,
+  attachment: {
+    fileType: string;
+    mimeType?: string;
+    fileName?: string;
+    fileSize?: number;
+    fileUrl?: string;
+    caption?: string;
+  }
+): Promise<void> {
   const pool = getPool();
   await pool.query(
     `INSERT INTO attachments (message_id, file_type, mime_type, file_name, file_size, file_url, caption)
      VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-    [messageId, attachment.fileType, attachment.mimeType, attachment.fileName, attachment.fileSize, attachment.fileUrl, attachment.caption]
+    [
+      messageId,
+      attachment.fileType,
+      attachment.mimeType,
+      attachment.fileName,
+      attachment.fileSize,
+      attachment.fileUrl,
+      attachment.caption,
+    ]
   );
 }
 
@@ -260,7 +273,10 @@ export async function getHistorySyncStatus(limit: number = 200): Promise<History
   }));
 }
 
-export async function linkParticipantToConversation(conversationId: string, participantId: string): Promise<void> {
+export async function linkParticipantToConversation(
+  conversationId: string,
+  participantId: string
+): Promise<void> {
   const pool = getPool();
   await pool.query(
     `INSERT INTO conversation_participants (conversation_id, participant_id)

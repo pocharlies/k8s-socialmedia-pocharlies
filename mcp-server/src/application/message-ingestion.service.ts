@@ -8,7 +8,11 @@ import {
   AttachmentType,
 } from '../domain/entities';
 import { DatabaseRepository } from '../infrastructure/database/repository';
-import { MessageReceivedEvent, MessageUpdatedEvent, ChatUpdatedEvent } from '@mcp-socialmedia/shared';
+import {
+  MessageReceivedEvent,
+  MessageUpdatedEvent,
+  ChatUpdatedEvent,
+} from '@mcp-socialmedia/shared';
 import pino from 'pino';
 
 export class MessageIngestionService {

@@ -52,13 +52,7 @@ async function main() {
   // Start embedding job only if OPENAI_API_KEY is configured
   let embeddingJob: EmbeddingJob | null = null;
   if (OPENAI_API_KEY) {
-    embeddingJob = new EmbeddingJob(
-      NATS_URL,
-      dbPool,
-      OPENAI_API_KEY,
-      ENCRYPTION_KEY,
-      NATS_CA_CERT
-    );
+    embeddingJob = new EmbeddingJob(NATS_URL, dbPool, OPENAI_API_KEY, ENCRYPTION_KEY, NATS_CA_CERT);
     await embeddingJob.start();
     console.log('Embedding pipeline started (OpenAI)');
   } else {

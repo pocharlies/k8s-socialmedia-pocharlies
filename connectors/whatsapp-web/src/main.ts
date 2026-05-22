@@ -4,12 +4,7 @@ import { QRHandler } from './qr-handler';
 import { EventPublisher } from './events/publisher';
 import { createRouter } from './api/controller';
 import { join } from 'path';
-import {
-  MessageReceivedEvent,
-  MessageUpdatedEvent,
-  ChatUpdatedEvent,
-  EventType,
-} from '@mcp-socialmedia/shared';
+import { MessageReceivedEvent, EventType } from '@mcp-socialmedia/shared';
 
 const SESSION_PATH = process.env.SESSION_PATH || join(process.cwd(), 'session-data');
 const ENCRYPTION_KEY =
@@ -43,7 +38,10 @@ async function main(): Promise<void> {
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       res.send(imgBuffer);
     } else {
-      res.status(404).json({ status: 'no_qr', message: 'No QR available — already connected or waiting for generation' });
+      res.status(404).json({
+        status: 'no_qr',
+        message: 'No QR available — already connected or waiting for generation',
+      });
     }
   });
 
@@ -138,43 +136,61 @@ window.onload = checkStatus;
     });
   });
 
-  client.on('chat-update', (update: { waChatId: string; updateType: string; metadata: Record<string, unknown> }) => {
-    eventPublisher.publishChatUpdated({
-      eventType: EventType.CHAT_UPDATED,
-      waChatId: update.waChatId,
-      updateType: update.updateType as 'NAME_CHANGED' | 'PARTICIPANT_ADDED' | 'PARTICIPANT_REMOVED',
-      metadata: update.metadata || {},
-    });
-  });
-
+  client.on(
+    'chat-update',
+    (update: { waChatId: string; updateType: string; metadata: Record<string, unknown> }) => {
+      eventPublisher.publishChatUpdated({
+        eventType: EventType.CHAT_UPDATED,
+        waChatId: update.waChatId,
+        updateType: update.updateType as
+          | 'NAME_CHANGED'
+          | 'PARTICIPANT_ADDED'
+          | 'PARTICIPANT_REMOVED',
+        metadata: update.metadata || {},
+      });
+    }
+  );
 
   // --- Public history endpoints (for sync service) ---
-  app.get("/api/public/chats", async (_req, res) => {
+  app.get('/api/public/chats', async (_req, res) => {
     try {
       const chats = await client.getChats();
-      res.json({ chats: chats.map((c: any) => ({ id: c.id?._serialized || c.id, name: c.name, isGroup: c.isGroup, timestamp: c.timestamp })) });
-    } catch (e) { console.error("Error getting chats:", e); res.status(500).json({ error: String(e) }); }
+      res.json({
+        chats: chats.map((c: any) => ({
+          id: c.id?._serialized || c.id,
+          name: c.name,
+          isGroup: c.isGroup,
+          timestamp: c.timestamp,
+        })),
+      });
+    } catch (e) {
+      console.error('Error getting chats:', e);
+      res.status(500).json({ error: String(e) });
+    }
   });
 
-  app.get("/api/public/history/:chatId", async (req, res) => {
+  app.get('/api/public/history/:chatId', async (req, res) => {
     try {
       const limit = parseInt(req.query.limit as string) || 500;
       const messages = await client.fetchChatHistory(req.params.chatId, limit);
       res.json({ messages });
-    } catch (e) { console.error("Error fetching history:", e); res.status(500).json({ error: String(e) }); }
+    } catch (e) {
+      console.error('Error fetching history:', e);
+      res.status(500).json({ error: String(e) });
+    }
   });
 
   // Best-effort historical media backfill — wwebjs can usually only fetch the
   // last ~50 messages per chat, so older media will be marked unavailable.
   // Run via: curl -X POST 'http://localhost:3001/api/public/backfill-media?days=7&limit=200'
-  app.post("/api/public/backfill-media", async (req, res) => {
+  app.post('/api/public/backfill-media', async (req, res) => {
     try {
       const days = parseInt(req.query.days as string) || 7;
       const limit = parseInt(req.query.limit as string) || 100;
       const result = await client.backfillRecentMedia(days, limit);
       res.json(result);
     } catch (e) {
-      console.error("Backfill failed:", e);
+      console.error('Backfill failed:', e);
       res.status(500).json({ error: String(e) });
     }
   });

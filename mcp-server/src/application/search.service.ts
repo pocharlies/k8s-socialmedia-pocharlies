@@ -27,7 +27,10 @@ export class SearchService {
   private readonly EMBEDDING_MODEL = 'text-embedding-3-small';
 
   constructor(openaiApiKey: string, dbClient: Pool, _encryptionKey: string, llmBaseUrl?: string) {
-    this.openai = new OpenAI({ apiKey: openaiApiKey || "sk-placeholder", ...(llmBaseUrl && { baseURL: llmBaseUrl }) });
+    this.openai = new OpenAI({
+      apiKey: openaiApiKey || 'sk-placeholder',
+      ...(llmBaseUrl && { baseURL: llmBaseUrl }),
+    });
     this.dbClient = dbClient;
     this.logger = pino({
       transport: {

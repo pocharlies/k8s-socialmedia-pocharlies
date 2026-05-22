@@ -69,8 +69,8 @@ export interface WhatsAppMessage {
 }
 
 interface CachedChat {
-  id: string;        // normalised JID
-  rawJid: string;    // original Baileys JID (used when calling sock APIs)
+  id: string; // normalised JID
+  rawJid: string; // original Baileys JID (used when calling sock APIs)
   name: string;
   isGroup: boolean;
   unreadCount: number;
@@ -199,12 +199,23 @@ export function classifyWhatsAppSendFailure(error: unknown): WhatsAppSendFailure
 
   const name = String(err?.name || '').toLowerCase();
   const text = `${name} ${errorMessage(error)}`.toLowerCase();
-  if (text.includes('sessionerror') || text.includes('no sessions') || text.includes('no open session') || text.includes('no session record') || text.includes('not-acceptable')) {
+  if (
+    text.includes('sessionerror') ||
+    text.includes('no sessions') ||
+    text.includes('no open session') ||
+    text.includes('no session record') ||
+    text.includes('not-acceptable')
+  ) {
     return 'missing_session';
   }
   if (text.includes('timeout') || text.includes('timed out')) return 'timeout';
   if (text.includes('not authenticated')) return 'auth';
-  if (text.includes('not connected') || text.includes('connection closed') || text.includes('connection lost')) return 'disconnected';
+  if (
+    text.includes('not connected') ||
+    text.includes('connection closed') ||
+    text.includes('connection lost')
+  )
+    return 'disconnected';
   if (text.includes('group metadata') || text.includes('not a group jid')) return 'group_metadata';
   return 'unknown';
 }
@@ -258,10 +269,19 @@ export class BaileysClient extends EventEmitter {
   private initializeStartedAt: Date | null = null;
   private lastQrReminderAt = 0;
   private reconnectAttempts = 0;
-  private readonly watchdogIntervalMs = parseInt(process.env.WA_WATCHDOG_INTERVAL_MS || '60000', 10);
+  private readonly watchdogIntervalMs = parseInt(
+    process.env.WA_WATCHDOG_INTERVAL_MS || '60000',
+    10
+  );
   private readonly initializeMaxMs = parseInt(process.env.WA_INITIALIZE_MAX_MS || '180000', 10);
-  private readonly retryMessageCacheTtlMs = parseInt(process.env.WA_RETRY_MESSAGE_CACHE_TTL_MS || String(24 * 60 * 60 * 1000), 10);
-  private readonly retryMessageCacheMax = parseInt(process.env.WA_RETRY_MESSAGE_CACHE_MAX || '5000', 10);
+  private readonly retryMessageCacheTtlMs = parseInt(
+    process.env.WA_RETRY_MESSAGE_CACHE_TTL_MS || String(24 * 60 * 60 * 1000),
+    10
+  );
+  private readonly retryMessageCacheMax = parseInt(
+    process.env.WA_RETRY_MESSAGE_CACHE_MAX || '5000',
+    10
+  );
   // Off by default. For iPhone history, ChatStorage.sqlite remains the primary
   // import source; this flag lets Baileys fill whatever WhatsApp sends during
   // a fresh device link without treating those messages as live events.
@@ -273,7 +293,7 @@ export class BaileysClient extends EventEmitter {
 
   // In-memory mirrors. Baileys removed makeInMemoryStore, so we keep the
   // minimum we need for the existing API contract.
-  private chatStore = new Map<string, CachedChat>();         // by normalised JID
+  private chatStore = new Map<string, CachedChat>(); // by normalised JID
   private groupMetaCache = new Map<string, GroupMetadata>(); // by raw JID
   private keyCache = new Map<string, { key: WAMessageKey; chatJid: string }>(); // by waMessageId
   private retryMessageCache: CacheStore;
@@ -325,7 +345,9 @@ export class BaileysClient extends EventEmitter {
       try {
         await ensureMediaBucket();
       } catch (e: any) {
-        this.logger.warn(`MinIO bucket check failed (auto-download may not work): ${e?.message || e}`);
+        this.logger.warn(
+          `MinIO bucket check failed (auto-download may not work): ${e?.message || e}`
+        );
       }
       await ensureHistoryTables();
 
@@ -346,7 +368,9 @@ export class BaileysClient extends EventEmitter {
           keys: makeCacheableSignalKeyStore(state.keys, baileysLogger),
         },
         printQRInTerminal: false,
-        browser: this.historySyncOnLogin ? Browsers.macOS('Desktop') : ['mcp-socialmedia', 'Chrome', '1.0.0'],
+        browser: this.historySyncOnLogin
+          ? Browsers.macOS('Desktop')
+          : ['mcp-socialmedia', 'Chrome', '1.0.0'],
         // Use a dedicated pino logger silencing inner noise; bumping to info
         // is too chatty.
         logger: baileysLogger,
@@ -489,8 +513,13 @@ export class BaileysClient extends EventEmitter {
         });
       }
       if (!this.historySyncOnLogin && Date.now() > this.historyBackfillRequestedUntil) return;
-      this.logger.info(`history.set received chats=${chats.length} messages=${messages.length} isLatest=${isLatest}`);
-      const byChat = new Map<string, { inserted: number; oldest?: WhatsAppMessage; newest?: WhatsAppMessage }>();
+      this.logger.info(
+        `history.set received chats=${chats.length} messages=${messages.length} isLatest=${isLatest}`
+      );
+      const byChat = new Map<
+        string,
+        { inserted: number; oldest?: WhatsAppMessage; newest?: WhatsAppMessage }
+      >();
       for (const m of messages) {
         try {
           const result = await this.ingestMessage(m, {
@@ -501,8 +530,10 @@ export class BaileysClient extends EventEmitter {
           if (!result.waMessage) continue;
           const entry = byChat.get(result.waMessage.conversationId) || { inserted: 0 };
           if (result.inserted) entry.inserted += 1;
-          if (!entry.oldest || result.waMessage.waTimestamp < entry.oldest.waTimestamp) entry.oldest = result.waMessage;
-          if (!entry.newest || result.waMessage.waTimestamp > entry.newest.waTimestamp) entry.newest = result.waMessage;
+          if (!entry.oldest || result.waMessage.waTimestamp < entry.oldest.waTimestamp)
+            entry.oldest = result.waMessage;
+          if (!entry.newest || result.waMessage.waTimestamp > entry.newest.waTimestamp)
+            entry.newest = result.waMessage;
           byChat.set(result.waMessage.conversationId, entry);
         } catch (e: any) {
           this.logger.warn(`history ingest failed for ${m.key?.id}: ${e?.message || e}`);
@@ -516,7 +547,9 @@ export class BaileysClient extends EventEmitter {
           newestTimestamp: state.newest?.waTimestamp,
           insertedCount: state.inserted,
           status: state.inserted > 0 ? 'pending' : 'requested',
-        }).catch(e => this.logger.warn(`history state update failed for ${conversationId}: ${e?.message || e}`));
+        }).catch(e =>
+          this.logger.warn(`history state update failed for ${conversationId}: ${e?.message || e}`)
+        );
       }
     });
 
@@ -560,8 +593,7 @@ export class BaileysClient extends EventEmitter {
         // Detect deletions
         const stub = u.update?.messageStubType;
         const isDeleted =
-          stub === proto.WebMessageInfo.StubType.REVOKE ||
-          (u.update?.message === null);
+          stub === proto.WebMessageInfo.StubType.REVOKE || u.update?.message === null;
         if (isDeleted) {
           this.emit('message-update', { waMessageId, updateType: 'DELETED' });
         }
@@ -572,9 +604,11 @@ export class BaileysClient extends EventEmitter {
       const { id, participants, action } = evt;
       const norm = this.normalizeJid(id);
       const updateType =
-        action === 'add' ? 'PARTICIPANT_ADDED'
-        : action === 'remove' ? 'PARTICIPANT_REMOVED'
-        : 'NAME_CHANGED';
+        action === 'add'
+          ? 'PARTICIPANT_ADDED'
+          : action === 'remove'
+            ? 'PARTICIPANT_REMOVED'
+            : 'NAME_CHANGED';
       this.emit('chat-update', {
         waChatId: norm,
         updateType,
@@ -590,7 +624,9 @@ export class BaileysClient extends EventEmitter {
     this.lastQrAt = new Date();
     qrcodeTerminal.generate(qr, { small: true });
     QRCode.toFile(join(this.sessionPath, 'qr.png'), qr, { width: 400 }).catch(() => {});
-    this.logger.warn(`WhatsApp requires QR scan at ${process.env.WA_QR_PUBLIC_URL || 'https://whatsapp.e-dani.com/'}`);
+    this.logger.warn(
+      `WhatsApp requires QR scan at ${process.env.WA_QR_PUBLIC_URL || 'https://whatsapp.e-dani.com/'}`
+    );
     this.emit('qr', qr);
   }
 
@@ -614,7 +650,9 @@ export class BaileysClient extends EventEmitter {
   private startWatchdog(): void {
     if (!this.watchdogIntervalMs || this.watchdogIntervalMs < 10000 || this.watchdogTimer) return;
     this.watchdogTimer = setInterval(() => {
-      void this.runWatchdog().catch(e => this.logger.warn(`WhatsApp watchdog failed: ${e?.message || e}`));
+      void this.runWatchdog().catch(e =>
+        this.logger.warn(`WhatsApp watchdog failed: ${e?.message || e}`)
+      );
     }, this.watchdogIntervalMs);
     (this.watchdogTimer as any).unref?.();
   }
@@ -631,15 +669,24 @@ export class BaileysClient extends EventEmitter {
 
     if (this.ready) return;
 
-    if (this.lastState === 'QR' || this.lastState === 'LOGGED_OUT' || this.lastState?.startsWith('CLOSED:401')) {
+    if (
+      this.lastState === 'QR' ||
+      this.lastState === 'LOGGED_OUT' ||
+      this.lastState?.startsWith('CLOSED:401')
+    ) {
       if (now - this.lastQrReminderAt > 10 * 60 * 1000) {
         this.lastQrReminderAt = now;
-        this.logger.warn(`WhatsApp is waiting for manual QR scan: ${process.env.WA_QR_PUBLIC_URL || 'https://whatsapp.e-dani.com/'}`);
+        this.logger.warn(
+          `WhatsApp is waiting for manual QR scan: ${process.env.WA_QR_PUBLIC_URL || 'https://whatsapp.e-dani.com/'}`
+        );
       }
       return;
     }
 
-    if (this.initializeStartedAt && now - this.initializeStartedAt.getTime() > this.initializeMaxMs) {
+    if (
+      this.initializeStartedAt &&
+      now - this.initializeStartedAt.getTime() > this.initializeMaxMs
+    ) {
       this.logger.warn(`Watchdog restarting stuck WhatsApp socket state=${this.lastState}`);
       await this.reconnectNow(`stuck in ${this.lastState || 'unknown'}`);
     }
@@ -651,7 +698,9 @@ export class BaileysClient extends EventEmitter {
     this.logger.warn(`Scheduling WhatsApp reconnect in ${delayMs}ms (${reason})`);
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
-      void this.reconnectNow(reason).catch(e => this.logger.error(`Reconnect failed: ${e?.message || e}`));
+      void this.reconnectNow(reason).catch(e =>
+        this.logger.error(`Reconnect failed: ${e?.message || e}`)
+      );
     }, delayMs);
     (this.reconnectTimer as any).unref?.();
   }
@@ -698,8 +747,8 @@ export class BaileysClient extends EventEmitter {
     });
 
     const senderRaw = msg.key.fromMe
-      ? (this.meJid || waMessage.senderWaId)
-      : (msg.key.participant || rawChatJid);
+      ? this.meJid || waMessage.senderWaId
+      : msg.key.participant || rawChatJid;
     const pushName = msg.pushName || undefined;
     await ensureParticipant({
       id: waMessage.senderWaId,
@@ -721,7 +770,8 @@ export class BaileysClient extends EventEmitter {
       replyToWaId: waMessage.replyToWaId,
       metadata: {
         source: options.source || 'live',
-        history_source: options.source === 'baileys_history_sync' ? 'baileys_history_sync' : undefined,
+        history_source:
+          options.source === 'baileys_history_sync' ? 'baileys_history_sync' : undefined,
         is_latest_history_sync: options.isLatest,
         sync_type: options.syncType,
       },
@@ -734,15 +784,31 @@ export class BaileysClient extends EventEmitter {
       fromMe: !!msg.key.fromMe,
       participantJid: msg.key.participant || undefined,
       messageTimestampMs: waMessage.waTimestamp.getTime(),
-    }).catch(e => this.logger.warn(`message key persist failed for ${waMessage.waMessageId}: ${e?.message || e}`));
+    }).catch(e =>
+      this.logger.warn(
+        `message key persist failed for ${waMessage.waMessageId}: ${e?.message || e}`
+      )
+    );
 
     if (!msgId) return { inserted: false, waMessage };
 
     this.logger.info(`Stored message ${waMessage.waMessageId} from ${waMessage.senderWaId}`);
 
-    if ((options.source || 'live') === 'live' && waMessage.messageType !== 'TEXT' && waMessage.messageType !== 'REACTION') {
-      this.downloadAndStoreMedia(msg, msgId, waMessage.messageType, waMessage.content || undefined)
-        .catch(err => this.logger.warn(`Media download failed for ${waMessage.waMessageId}: ${err?.message || err}`));
+    if (
+      (options.source || 'live') === 'live' &&
+      waMessage.messageType !== 'TEXT' &&
+      waMessage.messageType !== 'REACTION'
+    ) {
+      this.downloadAndStoreMedia(
+        msg,
+        msgId,
+        waMessage.messageType,
+        waMessage.content || undefined
+      ).catch(err =>
+        this.logger.warn(
+          `Media download failed for ${waMessage.waMessageId}: ${err?.message || err}`
+        )
+      );
     }
 
     if (options.publishEvent !== false) {
@@ -811,8 +877,8 @@ export class BaileysClient extends EventEmitter {
     }
 
     const senderRaw = msg.key.fromMe
-      ? (this.meJid || msg.key.remoteJid)
-      : (msg.key.participant || msg.key.remoteJid);
+      ? this.meJid || msg.key.remoteJid
+      : msg.key.participant || msg.key.remoteJid;
 
     return {
       waMessageId: msg.key.id,
@@ -837,8 +903,15 @@ export class BaileysClient extends EventEmitter {
     let buffer: Buffer;
     try {
       buffer = await Promise.race([
-        downloadMediaMessage(msg, 'buffer', {}, { logger: this.logger as any, reuploadRequest: this.sock!.updateMediaMessage }) as Promise<Buffer>,
-        new Promise<Buffer>((_, rej) => setTimeout(() => rej(new Error('downloadMedia timeout')), timeoutMs)),
+        downloadMediaMessage(
+          msg,
+          'buffer',
+          {},
+          { logger: this.logger as any, reuploadRequest: this.sock!.updateMediaMessage }
+        ),
+        new Promise<Buffer>((_, rej) =>
+          setTimeout(() => rej(new Error('downloadMedia timeout')), timeoutMs)
+        ),
       ]);
     } catch (e: any) {
       this.logger.warn(`downloadMedia failed for ${msg.key?.id}: ${e?.message || e}`);
@@ -868,11 +941,19 @@ export class BaileysClient extends EventEmitter {
   private mediaMetaFromMessage(msg: WAMessage): { mimeType?: string; fileName?: string } {
     const c = msg.message;
     if (!c) return {};
-    if (c.imageMessage) return { mimeType: c.imageMessage.mimetype || 'image/jpeg', fileName: undefined };
-    if (c.videoMessage) return { mimeType: c.videoMessage.mimetype || 'video/mp4', fileName: undefined };
-    if (c.audioMessage) return { mimeType: c.audioMessage.mimetype || 'audio/ogg', fileName: undefined };
-    if (c.documentMessage) return { mimeType: c.documentMessage.mimetype || undefined, fileName: c.documentMessage.fileName || undefined };
-    if (c.stickerMessage) return { mimeType: c.stickerMessage.mimetype || 'image/webp', fileName: undefined };
+    if (c.imageMessage)
+      return { mimeType: c.imageMessage.mimetype || 'image/jpeg', fileName: undefined };
+    if (c.videoMessage)
+      return { mimeType: c.videoMessage.mimetype || 'video/mp4', fileName: undefined };
+    if (c.audioMessage)
+      return { mimeType: c.audioMessage.mimetype || 'audio/ogg', fileName: undefined };
+    if (c.documentMessage)
+      return {
+        mimeType: c.documentMessage.mimetype || undefined,
+        fileName: c.documentMessage.fileName || undefined,
+      };
+    if (c.stickerMessage)
+      return { mimeType: c.stickerMessage.mimetype || 'image/webp', fileName: undefined };
     return {};
   }
 
@@ -882,7 +963,8 @@ export class BaileysClient extends EventEmitter {
 
   async sendMessage(chatId: string, content: string): Promise<string | undefined> {
     if (!this.sock) throw new Error('Client not initialized');
-    if (!this.isConnected()) throw new Error(`Client not connected (state=${this.lastState || 'unknown'})`);
+    if (!this.isConnected())
+      throw new Error(`Client not connected (state=${this.lastState || 'unknown'})`);
 
     const timeoutMs = parseInt(process.env.WA_SEND_TIMEOUT_MS || '45000', 10);
     const started = Date.now();
@@ -899,7 +981,8 @@ export class BaileysClient extends EventEmitter {
         clearSenderKeyMemory: false,
         failOnWarmupError: false,
       }).catch(e => {
-        const failureClass = classifyWhatsAppSendFailure(e) === 'timeout' ? 'timeout' : 'group_metadata';
+        const failureClass =
+          classifyWhatsAppSendFailure(e) === 'timeout' ? 'timeout' : 'group_metadata';
         throw this.buildSendError(failureClass, raw, normalized, true, started, 1, e);
       });
     }
@@ -908,9 +991,16 @@ export class BaileysClient extends EventEmitter {
       `Sending WhatsApp message rawJid=${raw} normalizedJid=${normalized} type=${isGroup ? 'group' : 'direct'}${groupRepair?.groupSubject ? ` groupSubject="${groupRepair.groupSubject}" participants=${groupRepair.participantCount}` : ''}`
     );
     try {
-      const sent = await this.sendTextWithTimeout(raw, content, timeoutMs, isGroup ? { useCachedGroupMetadata: false } : undefined);
+      const sent = await this.sendTextWithTimeout(
+        raw,
+        content,
+        timeoutMs,
+        isGroup ? { useCachedGroupMetadata: false } : undefined
+      );
       const messageId = sent?.key?.id;
-      this.logger.info(`WhatsApp message sent rawJid=${raw} normalizedJid=${normalized} elapsedMs=${Date.now() - started}${messageId ? ` id=${messageId}` : ''}`);
+      this.logger.info(
+        `WhatsApp message sent rawJid=${raw} normalizedJid=${normalized} elapsedMs=${Date.now() - started}${messageId ? ` id=${messageId}` : ''}`
+      );
       if (sent?.key) {
         this.rememberKey(messageId || '', sent.key, raw);
         this.rememberMessageForRetry(sent.key, sent.message);
@@ -936,9 +1026,13 @@ export class BaileysClient extends EventEmitter {
           this.logger.info(
             `Retrying WhatsApp group send after repair rawJid=${raw} normalizedJid=${normalized} groupSubject="${repair.groupSubject}" participants=${repair.participantCount} devices=${repair.deviceCount}`
           );
-          const retried = await this.sendTextWithTimeout(raw, content, timeoutMs, { useCachedGroupMetadata: false });
+          const retried = await this.sendTextWithTimeout(raw, content, timeoutMs, {
+            useCachedGroupMetadata: false,
+          });
           const messageId = retried?.key?.id;
-          this.logger.info(`WhatsApp group message sent after repair rawJid=${raw} normalizedJid=${normalized} elapsedMs=${Date.now() - started}${messageId ? ` id=${messageId}` : ''}`);
+          this.logger.info(
+            `WhatsApp group message sent after repair rawJid=${raw} normalizedJid=${normalized} elapsedMs=${Date.now() - started}${messageId ? ` id=${messageId}` : ''}`
+          );
           if (retried?.key) {
             this.rememberKey(messageId || '', retried.key, raw);
             this.rememberMessageForRetry(retried.key, retried.message);
@@ -949,11 +1043,22 @@ export class BaileysClient extends EventEmitter {
           this.logger.error(
             `WhatsApp group send failed after repair failureClass=${retryFailureClass} rawJid=${raw} normalizedJid=${normalized} attempt=2 elapsedMs=${Date.now() - started}${repair?.groupSubject ? ` groupSubject="${repair.groupSubject}"` : ''}: ${retryError?.message || retryError}`
           );
-          throw this.buildSendError(retryFailureClass, raw, normalized, true, started, 2, retryError, repair || groupRepair);
+          throw this.buildSendError(
+            retryFailureClass,
+            raw,
+            normalized,
+            true,
+            started,
+            2,
+            retryError,
+            repair || groupRepair
+          );
         }
       }
 
-      this.logger.error(`Failed to send WhatsApp message failureClass=${failureClass} rawJid=${raw} normalizedJid=${normalized} elapsedMs=${Date.now() - started}: ${e?.message || e}`);
+      this.logger.error(
+        `Failed to send WhatsApp message failureClass=${failureClass} rawJid=${raw} normalizedJid=${normalized} elapsedMs=${Date.now() - started}: ${e?.message || e}`
+      );
       throw this.buildSendError(failureClass, raw, normalized, isGroup, started, 1, e, groupRepair);
     }
   }
@@ -970,8 +1075,15 @@ export class BaileysClient extends EventEmitter {
     let payload: AnyMessageContent;
     if (contentType.startsWith('image/')) payload = { image: buf, caption };
     else if (contentType.startsWith('video/')) payload = { video: buf, caption };
-    else if (contentType.startsWith('audio/')) payload = { audio: buf, mimetype: contentType, ptt: false };
-    else payload = { document: buf, fileName, mimetype: contentType || 'application/octet-stream', caption };
+    else if (contentType.startsWith('audio/'))
+      payload = { audio: buf, mimetype: contentType, ptt: false };
+    else
+      payload = {
+        document: buf,
+        fileName,
+        mimetype: contentType || 'application/octet-stream',
+        caption,
+      };
 
     const sent = await this.sock.sendMessage(raw, payload);
     if (sent?.key?.id) {
@@ -997,14 +1109,17 @@ export class BaileysClient extends EventEmitter {
     this.logger.info(`Reacted with ${emoji} to ${messageId}`);
   }
 
-  async forwardMessage(chatId: string, messageId: string, toChatId: string): Promise<void> {
+  async forwardMessage(chatId: string, messageId: string, _toChatId: string): Promise<void> {
     if (!this.sock) throw new Error('Client not initialized');
     const cached = this.keyCache.get(messageId);
-    if (!cached) throw new Error(`forwardMessage: message ${messageId} not available (key cache miss)`);
+    if (!cached)
+      throw new Error(`forwardMessage: message ${messageId} not available (key cache miss)`);
     // We need the original WAMessage to forward content; Baileys forward
     // signature is sendMessage(jid, { forward: WAMessage }).
     // We don't keep the full WAMessage, only the key — so we re-send the cached body if any.
-    throw new Error('forwardMessage: not supported without full WAMessage cache; ask Claude to plumb message store if you need this');
+    throw new Error(
+      'forwardMessage: not supported without full WAMessage cache; ask Claude to plumb message store if you need this'
+    );
   }
 
   async deleteMessage(chatId: string, messageId: string): Promise<void> {
@@ -1083,18 +1198,31 @@ export class BaileysClient extends EventEmitter {
     }));
   }
 
-  async refreshGroupSession(groupId: string, options: GroupSessionRefreshOptions = {}): Promise<GroupSessionRefreshResult> {
+  async refreshGroupSession(
+    groupId: string,
+    options: GroupSessionRefreshOptions = {}
+  ): Promise<GroupSessionRefreshResult> {
     if (!this.sock) throw new Error('Client not initialized');
-    if (!this.isConnected()) throw new Error(`Client not connected (state=${this.lastState || 'unknown'})`);
+    if (!this.isConnected())
+      throw new Error(`Client not connected (state=${this.lastState || 'unknown'})`);
 
     const raw = this.toRawJid(groupId);
     if (!this.isGroupJid(raw)) throw new Error(`Not a group JID: ${groupId}`);
 
     const normalized = this.normalizeJid(raw);
     const timeoutMs = parseInt(process.env.WA_GROUP_SESSION_REFRESH_TIMEOUT_MS || '45000', 10);
-    const sessionTimeoutMs = parseInt(process.env.WA_GROUP_SESSION_ASSERT_TIMEOUT_MS || '12000', 10);
-    const batchSize = Math.max(1, Math.min(parseInt(process.env.WA_GROUP_SESSION_BATCH_SIZE || '25', 10), 100));
-    const sessionBatchSize = Math.max(1, Math.min(parseInt(process.env.WA_GROUP_SESSION_ASSERT_BATCH_SIZE || '1', 10), 25));
+    const sessionTimeoutMs = parseInt(
+      process.env.WA_GROUP_SESSION_ASSERT_TIMEOUT_MS || '12000',
+      10
+    );
+    const batchSize = Math.max(
+      1,
+      Math.min(parseInt(process.env.WA_GROUP_SESSION_BATCH_SIZE || '25', 10), 100)
+    );
+    const sessionBatchSize = Math.max(
+      1,
+      Math.min(parseInt(process.env.WA_GROUP_SESSION_ASSERT_BATCH_SIZE || '1', 10), 25)
+    );
     const warmSessions = options.warmSessions !== false;
     const warnings: string[] = [];
 
@@ -1120,7 +1248,9 @@ export class BaileysClient extends EventEmitter {
     let sessionFetchAttempted = false;
     if (warmSessions) {
       try {
-        const participantJids = Array.from(new Set(meta.participants.map(p => p.id).filter(Boolean)));
+        const participantJids = Array.from(
+          new Set(meta.participants.map(p => p.id).filter(Boolean))
+        );
         const devices = [];
         const participantBatches = this.chunk(participantJids, batchSize);
         for (let i = 0; i < participantBatches.length; i += 1) {
@@ -1134,11 +1264,13 @@ export class BaileysClient extends EventEmitter {
             : [];
           devices.push(...batchDevices);
         }
-        const deviceJids = Array.from(new Set(
-          devices
-            .filter(d => d.user !== undefined && d.user !== null)
-            .map(d => jidEncode(d.user, 's.whatsapp.net', d.device))
-        ));
+        const deviceJids = Array.from(
+          new Set(
+            devices
+              .filter(d => d.user !== undefined && d.user !== null)
+              .map(d => jidEncode(d.user, 's.whatsapp.net', d.device))
+          )
+        );
         deviceCount = deviceJids.length;
         if (deviceJids.length) {
           sessionFetchAttempted = true;
@@ -1165,7 +1297,9 @@ export class BaileysClient extends EventEmitter {
         const warning = `session warm-up failed: ${e?.message || e}`;
         warnings.push(warning);
         if (options.failOnWarmupError) throw e;
-        this.logger.warn(`WhatsApp group session warm-up warning rawJid=${raw} normalizedJid=${normalized}: ${warning}`);
+        this.logger.warn(
+          `WhatsApp group session warm-up warning rawJid=${raw} normalizedJid=${normalized}: ${warning}`
+        );
       }
     }
     if (skippedSenderKeyJids.length) {
@@ -1234,7 +1368,7 @@ export class BaileysClient extends EventEmitter {
       author: row.sender_wa_id,
       body: row.content,
       timestamp: Math.floor(new Date(row.wa_timestamp).getTime() / 1000),
-      fromMe: false,        // direction info not exposed cheap here
+      fromMe: false, // direction info not exposed cheap here
       hasMedia: row.message_type !== 'TEXT',
       type: row.message_type.toLowerCase(),
       isForwarded: row.is_forwarded,
@@ -1242,7 +1376,9 @@ export class BaileysClient extends EventEmitter {
     }));
   }
 
-  async getAllChatsWithHistory(messagesPerChat: number = 500): Promise<{ chat: string; name: string; isGroup: boolean; messages: any[] }[]> {
+  async getAllChatsWithHistory(
+    messagesPerChat: number = 500
+  ): Promise<{ chat: string; name: string; isGroup: boolean; messages: any[] }[]> {
     const chats = await this.getChats();
     const results = [];
     for (const c of chats) {
@@ -1254,21 +1390,28 @@ export class BaileysClient extends EventEmitter {
     return results;
   }
 
-  async backfillHistory(options: {
-    chatId?: string;
-    maxChats?: number;
-    maxBatchesPerChat?: number;
-    batchSize?: number;
-    dryRun?: boolean;
-  } = {}): Promise<{ requested: number; candidates: Array<{ chatId: string; oldestMessageId: string; oldestTimestamp: string }> }> {
+  async backfillHistory(
+    options: {
+      chatId?: string;
+      maxChats?: number;
+      maxBatchesPerChat?: number;
+      batchSize?: number;
+      dryRun?: boolean;
+    } = {}
+  ): Promise<{
+    requested: number;
+    candidates: Array<{ chatId: string; oldestMessageId: string; oldestTimestamp: string }>;
+  }> {
     if (!this.sock) throw new Error('Client not initialized');
-    if (!this.isConnected()) throw new Error(`Client not connected (state=${this.lastState || 'unknown'})`);
+    if (!this.isConnected())
+      throw new Error(`Client not connected (state=${this.lastState || 'unknown'})`);
     await ensureHistoryTables();
 
     const maxChats = Math.max(1, Math.min(options.maxChats || 20, 200));
     const maxBatchesPerChat = Math.max(1, Math.min(options.maxBatchesPerChat || 1, 20));
     const batchSize = Math.max(1, Math.min(options.batchSize || 50, 50));
-    const candidates: Array<{ chatId: string; oldestMessageId: string; oldestTimestamp: string }> = [];
+    const candidates: Array<{ chatId: string; oldestMessageId: string; oldestTimestamp: string }> =
+      [];
     let requested = 0;
 
     const pool = getPool();
@@ -1313,7 +1456,11 @@ export class BaileysClient extends EventEmitter {
           participant: row.participant_jid || undefined,
         };
         this.historyBackfillRequestedUntil = Date.now() + 5 * 60 * 1000;
-        await (this.sock as any).fetchMessageHistory(batchSize, key, Math.floor(Number(row.message_timestamp_ms) / 1000));
+        await (this.sock as any).fetchMessageHistory(
+          batchSize,
+          key,
+          Math.floor(Number(row.message_timestamp_ms) / 1000)
+        );
         requested += 1;
         await recordHistorySyncProgress({
           conversationId: row.conversation_id,
@@ -1340,7 +1487,10 @@ export class BaileysClient extends EventEmitter {
   // Media download
   // ---------------------------------------------------------------------------
 
-  async downloadMedia(chatId: string, messageId: string): Promise<{ data: string; mimetype: string; filename: string } | null> {
+  async downloadMedia(
+    chatId: string,
+    messageId: string
+  ): Promise<{ data: string; mimetype: string; filename: string } | null> {
     if (!this.sock) throw new Error('Client not initialized');
     const cached = this.keyCache.get(messageId);
     if (!cached) {
@@ -1350,11 +1500,16 @@ export class BaileysClient extends EventEmitter {
     // Baileys can't fetch a media we don't have; we'd need the full WAMessage.
     // We don't keep it. For attachments persisted to MinIO use the /media-blob/
     // endpoint instead.
-    this.logger.warn('downloadMedia: live re-download not implemented; use MinIO storage_key from attachments table');
+    this.logger.warn(
+      'downloadMedia: live re-download not implemented; use MinIO storage_key from attachments table'
+    );
     return null;
   }
 
-  async backfillRecentMedia(_daysBack: number = 7, _limit: number = 100): Promise<{ ok: number; unavailable: number; total: number }> {
+  async backfillRecentMedia(
+    _daysBack: number = 7,
+    _limit: number = 100
+  ): Promise<{ ok: number; unavailable: number; total: number }> {
     // Live re-download by id isn't reliable with Baileys without keeping the
     // full WAMessage. The history-on-login sync already retrieves recent media
     // and pipes it through ingestMessage(). Surface a no-op so legacy callers
@@ -1472,7 +1627,10 @@ export class BaileysClient extends EventEmitter {
     this.keyCache.set(waMessageId, { key, chatJid });
   }
 
-  private rememberMessageForRetry(key: WAMessageKey | undefined, message: proto.IMessage | null | undefined): void {
+  private rememberMessageForRetry(
+    key: WAMessageKey | undefined,
+    message: proto.IMessage | null | undefined
+  ): void {
     if (!key?.id || !message) return;
     this.retryMessageCache.set(key.id, message);
     if (key.remoteJid) {
@@ -1489,11 +1647,16 @@ export class BaileysClient extends EventEmitter {
     if (!messageId) return undefined;
 
     const remoteJid = key.remoteJid || '';
-    const cached = (
-      remoteJid ? this.retryMessageCache.get<proto.IMessage>(this.retryMessageCacheKey(remoteJid, messageId)) : undefined
-    ) || this.retryMessageCache.get<proto.IMessage>(messageId);
+    const cached =
+      (remoteJid
+        ? this.retryMessageCache.get<proto.IMessage>(
+            this.retryMessageCacheKey(remoteJid, messageId)
+          )
+        : undefined) || this.retryMessageCache.get<proto.IMessage>(messageId);
     if (cached) {
-      this.logger.debug(`WhatsApp retry message cache hit remoteJid=${remoteJid || 'unknown'} messageId=${messageId}`);
+      this.logger.debug(
+        `WhatsApp retry message cache hit remoteJid=${remoteJid || 'unknown'} messageId=${messageId}`
+      );
       return cached;
     }
 
@@ -1507,11 +1670,15 @@ export class BaileysClient extends EventEmitter {
       return reconstructed;
     }
 
-    this.logger.warn(`WhatsApp retry requested but message content is unavailable remoteJid=${remoteJid || 'unknown'} messageId=${messageId}`);
+    this.logger.warn(
+      `WhatsApp retry requested but message content is unavailable remoteJid=${remoteJid || 'unknown'} messageId=${messageId}`
+    );
     return undefined;
   }
 
-  private async reconstructMessageForRetryFromDb(messageId: string): Promise<proto.IMessage | undefined> {
+  private async reconstructMessageForRetryFromDb(
+    messageId: string
+  ): Promise<proto.IMessage | undefined> {
     try {
       const pool = getPool();
       const r = await pool.query(
@@ -1525,12 +1692,17 @@ export class BaileysClient extends EventEmitter {
       if (!row || row.message_type !== 'TEXT' || !row.content) return undefined;
       return { conversation: row.content };
     } catch (e: any) {
-      this.logger.warn(`WhatsApp retry DB lookup failed messageId=${messageId}: ${e?.message || e}`);
+      this.logger.warn(
+        `WhatsApp retry DB lookup failed messageId=${messageId}: ${e?.message || e}`
+      );
       return undefined;
     }
   }
 
-  private async reconstructKeyFromDb(waMessageId: string, chatId: string): Promise<WAMessageKey | null> {
+  private async reconstructKeyFromDb(
+    waMessageId: string,
+    chatId: string
+  ): Promise<WAMessageKey | null> {
     const pool = getPool();
     const r = await pool.query(
       `SELECT direction, sender_wa_id FROM messages WHERE wa_message_id = $1 LIMIT 1`,
@@ -1548,7 +1720,9 @@ export class BaileysClient extends EventEmitter {
   }
 
   private shouldRetryGroupSend(failureClass: WhatsAppSendFailureClass): boolean {
-    return failureClass === 'missing_session' || failureClass === 'timeout' || failureClass === 'unknown';
+    return (
+      failureClass === 'missing_session' || failureClass === 'timeout' || failureClass === 'unknown'
+    );
   }
 
   private async sendTextWithTimeout(
@@ -1589,13 +1763,26 @@ export class BaileysClient extends EventEmitter {
       actionable: actionableForFailure(failureClass, isGroup),
       repair,
     };
-    return new WhatsAppSendError(`WhatsApp send failed (${failureClass}): ${causeMessage}`, details, cause);
+    return new WhatsAppSendError(
+      `WhatsApp send failed (${failureClass}): ${causeMessage}`,
+      details,
+      cause
+    );
   }
 
   private race<T>(p: Promise<T>, ms: number, msg: string): Promise<T> {
     return new Promise<T>((resolve, reject) => {
       const t = setTimeout(() => reject(new Error(msg)), ms);
-      p.then(v => { clearTimeout(t); resolve(v); }, e => { clearTimeout(t); reject(e); });
+      p.then(
+        v => {
+          clearTimeout(t);
+          resolve(v);
+        },
+        e => {
+          clearTimeout(t);
+          reject(e);
+        }
+      );
     });
   }
 }
