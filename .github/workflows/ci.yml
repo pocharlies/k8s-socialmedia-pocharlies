@@ -17,6 +17,7 @@ jobs:
     uses: pocharlies/k8s-gitops-pocharlies/.github/workflows/reusable-ci.yml@main
     with:
       runner: arc-amd64
+      docker_build_timeout: 5m
       kustomize_paths: k8s/overlays/stg k8s/overlays/prod
       images: |
         [
