@@ -1,9 +1,12 @@
-FROM node:20-alpine
+FROM node:20-bookworm-slim
 
 WORKDIR /app
 
-RUN apk add --no-cache git
-RUN npm install -g pnpm tsx
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+RUN npm install -g pnpm@8.15.0 tsx@4.7.0
 
 # Copy package files
 COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml tsconfig.json ./
