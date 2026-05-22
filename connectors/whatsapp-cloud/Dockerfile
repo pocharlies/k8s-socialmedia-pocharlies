@@ -1,14 +1,11 @@
-FROM node:20-bookworm-slim
+FROM node:20-bookworm
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    git \
-    ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
 RUN npm install -g pnpm@8.15.0 tsx@4.7.0
 
 COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml tsconfig.json ./
+COPY connectors/tsconfig.json ./connectors/tsconfig.json
 COPY connectors/whatsapp-cloud/package.json connectors/whatsapp-cloud/tsconfig.json ./connectors/whatsapp-cloud/
 COPY shared/package.json shared/tsconfig.json ./shared/
 

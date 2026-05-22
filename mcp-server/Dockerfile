@@ -1,12 +1,8 @@
-FROM node:20-bookworm-slim
+FROM node:20-bookworm
 
 WORKDIR /app
 
-# Install git, pnpm, and tsx globally
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    git \
-    ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+# Install pnpm and tsx globally
 RUN npm install -g pnpm@8.15.0 tsx@4.7.0
 
 # Copy package files

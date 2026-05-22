@@ -1,13 +1,8 @@
-FROM node:20-bookworm-slim
+FROM node:20-bookworm
 
 WORKDIR /app
 
 # Baileys is a pure Node.js WebSocket client — no Chromium/Puppeteer needed.
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    git \
-    ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
-
 RUN npm install -g pnpm@8.15.0 tsx@4.7.0
 
 COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml tsconfig.json ./

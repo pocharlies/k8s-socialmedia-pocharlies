@@ -1,12 +1,4 @@
-FROM node:20-bookworm-slim
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    git \
-    python3 \
-    make \
-    g++ \
-    ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+FROM node:20-bookworm
 
 RUN corepack enable && corepack prepare pnpm@8.15.0 --activate
 

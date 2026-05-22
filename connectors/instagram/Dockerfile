@@ -1,15 +1,12 @@
-FROM node:20-bookworm-slim
+FROM node:20-bookworm
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    git \
-    ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
 RUN npm install -g pnpm@8.15.0 tsx@4.7.0
 
 # Copy package files
 COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml tsconfig.json ./
+COPY connectors/tsconfig.json ./connectors/tsconfig.json
 COPY connectors/instagram/package.json connectors/instagram/tsconfig.json ./connectors/instagram/
 COPY shared/package.json shared/tsconfig.json ./shared/
 

@@ -1,9 +1,5 @@
 # Standalone builder — no dependency on local sibling images for CI compatibility
-FROM node:20-bookworm-slim AS builder
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    git ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+FROM node:20-bookworm AS builder
 
 WORKDIR /build-worker
 
