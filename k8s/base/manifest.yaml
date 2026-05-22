@@ -183,6 +183,17 @@ spec:
     - { name: api, port: 9000, targetPort: 9000 }
     - { name: console, port: 9001, targetPort: 9001 }
 
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: whatsapp-session-data
+  namespace: whatsapp-mcp
+spec:
+  accessModes: [ReadWriteOnce]
+  resources: { requests: { storage: 1Gi } }
+  storageClassName: longhorn
+
 # ── Connectors (stateless) ────────────────────────────────────────────────────
 ---
 apiVersion: apps/v1
@@ -192,6 +203,7 @@ metadata:
   namespace: whatsapp-mcp
 spec:
   replicas: 1
+  strategy: { type: Recreate }
   selector: { matchLabels: { app: whatsapp-connector } }
   template:
     metadata: { labels: { app: whatsapp-connector } }
@@ -230,9 +242,7 @@ spec:
               mountPath: /app/persistent-session
       volumes:
         - name: whatsapp-session-data
-          hostPath:
-            path: /home/dibanez/mcp-socialmedia/connectors/whatsapp-web/session-data
-            type: DirectoryOrCreate
+          persistentVolumeClaim: { claimName: whatsapp-session-data }
 ---
 apiVersion: v1
 kind: Service
