@@ -43,7 +43,7 @@ metadata:
   namespace: whatsapp-mcp
 spec:
   serviceName: whatsapp-mcp-postgres
-  replicas: 1
+  replicas: 0
   selector: { matchLabels: { app: whatsapp-mcp-postgres } }
   template:
     metadata: { labels: { app: whatsapp-mcp-postgres } }
@@ -254,7 +254,7 @@ spec:
           env:
             - { name: REDIS_URL, value: "redis://whatsapp-mcp-redis.whatsapp-mcp.svc.cluster.local:6379" }
             - { name: NATS_URL, value: "nats://whatsapp-mcp-nats.whatsapp-mcp.svc.cluster.local:4222" }
-            - { name: DATABASE_URL, value: "postgresql://$(DB_USER):$(DB_PASSWORD)@whatsapp-mcp-postgres.whatsapp-mcp.svc.cluster.local:5432/whatsappmcp" }
+            - { name: DATABASE_URL, value: "postgresql://$(DB_USER):$(DB_PASSWORD)@postgres-shared-rw.databases.svc.cluster.local:5432/whatsappmcp" }
           envFrom: [{ secretRef: { name: whatsapp-mcp-secrets } }]
           resources:
             requests: { cpu: 50m, memory: 128Mi }
@@ -383,7 +383,7 @@ spec:
           ports: [{ name: http, containerPort: 3000 }]
           env:
             - { name: NATS_URL, value: "nats://whatsapp-mcp-nats.whatsapp-mcp.svc.cluster.local:4222" }
-            - { name: DATABASE_URL, value: "postgresql://$(DB_USER):$(DB_PASSWORD)@whatsapp-mcp-postgres.whatsapp-mcp.svc.cluster.local:5432/whatsappmcp" }
+            - { name: DATABASE_URL, value: "postgresql://$(DB_USER):$(DB_PASSWORD)@postgres-shared-rw.databases.svc.cluster.local:5432/whatsappmcp" }
           envFrom: [{ secretRef: { name: whatsapp-mcp-secrets } }]
           resources:
             requests: { cpu: 50m, memory: 128Mi }
@@ -486,7 +486,7 @@ spec:
           ports: [{ name: http, containerPort: 3080 }]
           env:
             - { name: NATS_URL, value: "nats://whatsapp-mcp-nats.whatsapp-mcp.svc.cluster.local:4222" }
-            - { name: DATABASE_URL, value: "postgresql://$(DB_USER):$(DB_PASSWORD)@whatsapp-mcp-postgres.whatsapp-mcp.svc.cluster.local:5432/whatsappmcp" }
+            - { name: DATABASE_URL, value: "postgresql://$(DB_USER):$(DB_PASSWORD)@postgres-shared-rw.databases.svc.cluster.local:5432/whatsappmcp" }
             - { name: MINIO_ENDPOINT, value: "whatsapp-mcp-minio.whatsapp-mcp.svc.cluster.local:9000" }
             - { name: MINIO_ACCESS_KEY, value: "$(MINIO_ROOT_USER)" }
             - { name: MINIO_SECRET_KEY, value: "$(MINIO_ROOT_PASSWORD)" }

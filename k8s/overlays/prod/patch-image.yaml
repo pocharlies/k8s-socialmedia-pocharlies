@@ -1,0 +1,83 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: whatsapp-connector
+  namespace: whatsapp-mcp
+spec:
+  template:
+    spec:
+      containers:
+        - name: whatsapp-connector
+          image: harbor.e-dani.com/homelab/whatsappmcp-whatsapp-connector:latest
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: whatsapp-cloud-connector
+  namespace: whatsapp-mcp
+spec:
+  template:
+    spec:
+      containers:
+        - name: whatsapp-cloud-connector
+          image: harbor.e-dani.com/homelab/whatsappmcp-whatsapp-cloud-connector:latest
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: instagram-connector
+  namespace: whatsapp-mcp
+spec:
+  template:
+    spec:
+      containers:
+        - name: instagram-connector
+          image: harbor.e-dani.com/homelab/whatsappmcp-instagram-connector:latest
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: telegram-connector
+  namespace: whatsapp-mcp
+spec:
+  template:
+    spec:
+      containers:
+        - name: telegram-connector
+          image: harbor.e-dani.com/homelab/whatsappmcp-telegram-connector:latest
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcp-server
+  namespace: whatsapp-mcp
+spec:
+  template:
+    spec:
+      containers:
+        - name: mcp-server
+          image: harbor.e-dani.com/homelab/whatsappmcp-mcp-server:latest
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auto-reply-worker
+  namespace: whatsapp-mcp
+spec:
+  template:
+    spec:
+      containers:
+        - name: auto-reply-worker
+          image: harbor.e-dani.com/homelab/whatsappmcp-auto-reply-worker:latest
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: telegram-sync
+  namespace: whatsapp-mcp
+spec:
+  template:
+    spec:
+      containers:
+        - name: telegram-sync
+          image: harbor.e-dani.com/homelab/whatsappmcp-telegram-sync:latest

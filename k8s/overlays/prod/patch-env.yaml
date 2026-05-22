@@ -1,0 +1,9 @@
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: whatsapp-mcp-secrets
+  namespace: whatsapp-mcp
+spec:
+  dataFrom:
+    - extract:
+        key: secret/whatsapp-mcp
