@@ -206,8 +206,16 @@ spec:
             - { name: REDIS_URL, value: "redis://whatsapp-mcp-redis.whatsapp-mcp.svc.cluster.local:6379" }
             - { name: NATS_URL, value: "nats://whatsapp-mcp-nats.whatsapp-mcp.svc.cluster.local:4222" }
             - { name: DATABASE_URL, value: "postgresql://$(DB_USER):$(DB_PASSWORD)@postgres-shared-rw.databases.svc.cluster.local:5432/whatsappmcp" }
+            - { name: ENABLE_SENDING, value: "true" }
+            - { name: WA_QR_PUBLIC_URL, value: "https://whatsapp.e-dani.com/qr/page" }
+            - { name: MINIO_ENDPOINT, value: "whatsapp-mcp-minio.whatsapp-mcp.svc.cluster.local:9000" }
+            - { name: MINIO_ACCESS_KEY, value: "$(MINIO_ROOT_USER)" }
+            - { name: MINIO_SECRET_KEY, value: "$(MINIO_ROOT_PASSWORD)" }
+            - { name: MINIO_USE_SSL, value: "false" }
+            - { name: MINIO_BUCKET, value: "socialmedia-media" }
             - { name: EMBEDDING_BASE_URL, value: "http://bge-m3-embedding.llm.svc.cluster.local:8000/v1" }
             - { name: EMBEDDING_MODEL, value: "bge-m3" }
+            - { name: EMBEDDING_DIMENSION, value: "1024" }
           envFrom: [{ secretRef: { name: whatsapp-mcp-secrets } }]
           resources:
             requests: { cpu: 50m, memory: 128Mi }
@@ -337,6 +345,9 @@ spec:
           env:
             - { name: NATS_URL, value: "nats://whatsapp-mcp-nats.whatsapp-mcp.svc.cluster.local:4222" }
             - { name: DATABASE_URL, value: "postgresql://$(DB_USER):$(DB_PASSWORD)@postgres-shared-rw.databases.svc.cluster.local:5432/whatsappmcp" }
+            - { name: EMBEDDING_BASE_URL, value: "http://bge-m3-embedding.llm.svc.cluster.local:8000/v1" }
+            - { name: EMBEDDING_MODEL, value: "bge-m3" }
+            - { name: EMBEDDING_DIMENSION, value: "1024" }
           envFrom: [{ secretRef: { name: whatsapp-mcp-secrets } }]
           resources:
             requests: { cpu: 50m, memory: 128Mi }
@@ -455,6 +466,9 @@ spec:
           env:
             - { name: NATS_URL, value: "nats://whatsapp-mcp-nats.whatsapp-mcp.svc.cluster.local:4222" }
             - { name: LITELLM_URL, value: "http://litellm.litellm.svc.cluster.local:4000" }
+            - { name: DATABASE_URL, value: "postgresql://$(DB_USER):$(DB_PASSWORD)@postgres-shared-rw.databases.svc.cluster.local:5432/whatsappmcp" }
+            - { name: CONNECTOR_URL, value: "http://whatsapp-connector.whatsapp-mcp.svc.cluster.local:3001/api/v1/messages/send" }
+            - { name: CONNECTOR_SECRET, value: "$(CONNECTOR_SHARED_SECRET)" }
           envFrom: [{ secretRef: { name: whatsapp-mcp-secrets } }]
           volumeMounts:
             - name: config
@@ -496,6 +510,8 @@ spec:
           env:
             - { name: NATS_URL, value: "nats://whatsapp-mcp-nats.whatsapp-mcp.svc.cluster.local:4222" }
             - { name: DATABASE_URL, value: "postgresql://$(DB_USER):$(DB_PASSWORD)@postgres-shared-rw.databases.svc.cluster.local:5432/whatsappmcp" }
+            - name: TELEGRAM_SESSION_STRING
+              valueFrom: { secretKeyRef: { name: whatsapp-mcp-secrets, key: TELETHON_SESSION_STRING } }
             - { name: MINIO_ENDPOINT, value: "whatsapp-mcp-minio.whatsapp-mcp.svc.cluster.local:9000" }
             - { name: MINIO_ACCESS_KEY, value: "$(MINIO_ROOT_USER)" }
             - { name: MINIO_SECRET_KEY, value: "$(MINIO_ROOT_PASSWORD)" }
