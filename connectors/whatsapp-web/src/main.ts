@@ -21,7 +21,7 @@ async function main(): Promise<void> {
   const eventPublisher = new EventPublisher(NATS_URL, NATS_CA_CERT);
 
   const app = express();
-  app.use(express.json());
+  app.use(express.json({ limit: '15mb' })); // large enough for base64 voice notes
   app.use('/api/v1', createRouter(client, qrHandler, CONNECTOR_SHARED_SECRET));
 
   app.get('/', (_req, res) => {

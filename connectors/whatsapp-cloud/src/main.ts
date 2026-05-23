@@ -54,7 +54,7 @@ async function main(): Promise<void> {
   app.use('/webhook', express.json({
     verify: (req: any, _res, buf) => { req.rawBody = buf.toString(); },
   }));
-  app.use(express.json());
+  app.use(express.json({ limit: '15mb' })); // large enough for base64 voice notes
 
   // Webhook routes (verification + incoming messages)
   app.use('/', createWebhookRouter(
@@ -170,6 +170,26 @@ async function main(): Promise<void> {
       const result = await api.sendImage(conversationId, imageUrl, caption);
       res.json({ messageId: result.messages?.[0]?.id });
     } catch (error) {
+      res.status(500).json({ error: String(error) });
+    }
+  });
+
+  // Send audio / voice note — {conversationId, audioBase64, mimeType}
+  app.post('/api/v1/messages/audio', hmacAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { conversationId, audioBase64, mimeType } = req.body;
+      if (!conversationId || !audioBase64) {
+        res.status(400).json({ error: 'conversationId and audioBase64 required' });
+        return;
+      }
+      const buffer = Buffer.from(audioBase64, 'base64');
+      const mediaId = await api.uploadMedia(buffer, mimeType || 'audio/ogg', 'voice.ogg');
+      const result = await api.sendAudio(conversationId, mediaId);
+      const messageId = result.messages?.[0]?.id || '';
+      res.json({ messageId, sentAt: new Date().toISOString() });
+      logger.info({ to: conversationId, messageId, mediaId }, 'Voice note sent');
+    } catch (error) {
+      logger.error({ error: String(error) }, 'Failed to send voice note');
       res.status(500).json({ error: String(error) });
     }
   });

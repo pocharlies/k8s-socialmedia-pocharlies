@@ -151,6 +151,46 @@ export function createRouter(
     })();
   });
 
+  // Send a voice note (requires auth) — {conversationId, audioBase64, mimeType}
+  router.post('/messages/audio', auth, (req: AuthenticatedRequest, res: Response): void => {
+    void (async (): Promise<void> => {
+      try {
+        const body = req.body as { conversationId?: string; audioBase64?: string; mimeType?: string };
+        const { conversationId, audioBase64, mimeType } = body;
+
+        if (!conversationId || !audioBase64) {
+          res.status(400).json({ error: 'Missing conversationId or audioBase64' });
+          return;
+        }
+        if (process.env.ENABLE_SENDING !== 'true' || process.env.EMERGENCY_DISABLE_SENDING === 'true') {
+          res.status(statusForSendFailure('disabled_sending')).json({
+            error: 'Sending is disabled',
+            failureClass: 'disabled_sending',
+          });
+          return;
+        }
+        if (!client.isConnected()) {
+          res.status(statusForSendFailure('disconnected')).json({
+            error: `WhatsApp is not connected (state=${client.getCachedState() || 'unknown'})`,
+            failureClass: 'disconnected',
+          });
+          return;
+        }
+
+        const buf = Buffer.from(audioBase64, 'base64');
+        const messageId = await client.sendVoice(conversationId, buf, mimeType || 'audio/ogg; codecs=opus');
+        console.info(`WhatsApp voice sent conversationId=${conversationId} messageId=${messageId || ''}`);
+        res.json({ messageId, sentAt: new Date().toISOString() });
+      } catch (error) {
+        const failureClass = classifyWhatsAppSendFailure(error);
+        res.status(statusForSendFailure(failureClass)).json({
+          error: `Failed to send voice: ${errorMessage(error)}`,
+          failureClass,
+        });
+      }
+    })();
+  });
+
   // React to a message (requires auth)
   router.post('/messages/react', auth, (req: AuthenticatedRequest, res: Response): void => {
     void (async (): Promise<void> => {

@@ -1092,6 +1092,26 @@ export class BaileysClient extends EventEmitter {
     }
   }
 
+  /** Send an Ogg/Opus clip as a WhatsApp voice note (PTT). */
+  async sendVoice(
+    chatId: string,
+    audio: Buffer,
+    mimetype = 'audio/ogg; codecs=opus'
+  ): Promise<string | undefined> {
+    if (!this.sock) throw new Error('Client not initialized');
+    if (!this.isConnected())
+      throw new Error(`Client not connected (state=${this.lastState || 'unknown'})`);
+    const raw = this.toRawJid(chatId);
+    const payload: AnyMessageContent = { audio, mimetype, ptt: true };
+    const sent = await this.sock.sendMessage(raw, payload);
+    const messageId = sent?.key?.id;
+    if (sent?.key) {
+      this.rememberKey(messageId || '', sent.key, raw);
+      this.rememberMessageForRetry(sent.key, sent.message);
+    }
+    return messageId || undefined;
+  }
+
   async reactToMessage(chatId: string, messageId: string, emoji: string): Promise<void> {
     if (!this.sock) throw new Error('Client not initialized');
     const cached = this.keyCache.get(messageId);

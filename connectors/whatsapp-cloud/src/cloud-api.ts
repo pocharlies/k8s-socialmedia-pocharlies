@@ -122,6 +122,41 @@ export class WhatsAppCloudAPI {
     );
   }
 
+  /** Upload binary media to WhatsApp; returns the media id used to send it. */
+  async uploadMedia(data: Buffer, mimeType: string, filename = 'audio.ogg'): Promise<string> {
+    const url = `${GRAPH_API_BASE}/${this.config.phoneNumberId}/media`;
+    const form = new FormData();
+    form.append('messaging_product', 'whatsapp');
+    form.append('type', mimeType);
+    form.append('file', new Blob([data], { type: mimeType }), filename);
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${this.config.accessToken}` },
+      body: form,
+    });
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`WhatsApp media upload error (${response.status}): ${error}`);
+    }
+    const json = (await response.json()) as { id: string };
+    return json.id;
+  }
+
+  /** Send an audio message by media id. Ogg/Opus renders as a voice note (PTT). */
+  async sendAudio(to: string, mediaId: string): Promise<SendMessageResponse> {
+    return this.request<SendMessageResponse>(
+      `/${this.config.phoneNumberId}/messages`,
+      'POST',
+      {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to,
+        type: 'audio',
+        audio: { id: mediaId },
+      }
+    );
+  }
+
   async markAsRead(messageId: string): Promise<{ success: boolean }> {
     return this.request<{ success: boolean }>(
       `/${this.config.phoneNumberId}/messages`,
