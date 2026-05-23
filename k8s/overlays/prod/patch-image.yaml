@@ -8,7 +8,7 @@ spec:
     spec:
       containers:
         - name: whatsapp-connector
-          image: harbor.e-dani.com/homelab/whatsappmcp-whatsapp-connector:v1.3.12@sha256:359b4101ca46858b76cfe218f0c9a9b8494a1843c2281829b3ab709b7f9d6f91
+          image: harbor.e-dani.com/homelab/whatsappmcp-whatsapp-connector:v1.3.13
 ---
 apiVersion: apps/v1
 kind: Deployment
