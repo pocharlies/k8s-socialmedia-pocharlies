@@ -13,8 +13,8 @@ images:
     newTag: v1.3.12
     digest: sha256:77129373fc7f5e7b2417c50e9ac6674b3ea90c5cfb9bd2aacadd09e4d9d8fd6a
   - name: harbor.e-dani.com/homelab/whatsappmcp-telegram-connector
-    newTag: v1.3.12
-    digest: sha256:f3c0593c82924efcf779fa5db9d49fbac8b55f8d63e75fb4d2a0626e441a8074
+    newTag: v1.3.13
+    digest: sha256:481b56759a60808f4715c7bacf67800e4e584c1f8b402dddd028f6cfbab318a3
   - name: harbor.e-dani.com/homelab/whatsappmcp-telegram-sync
     newTag: latest
   - name: harbor.e-dani.com/homelab/whatsappmcp-instagram-connector

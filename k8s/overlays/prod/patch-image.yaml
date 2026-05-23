@@ -44,7 +44,7 @@ spec:
     spec:
       containers:
         - name: telegram-connector
-          image: harbor.e-dani.com/homelab/whatsappmcp-telegram-connector:v1.3.12@sha256:f3c0593c82924efcf779fa5db9d49fbac8b55f8d63e75fb4d2a0626e441a8074
+          image: harbor.e-dani.com/homelab/whatsappmcp-telegram-connector:v1.3.13@sha256:481b56759a60808f4715c7bacf67800e4e584c1f8b402dddd028f6cfbab318a3
 ---
 apiVersion: apps/v1
 kind: Deployment
