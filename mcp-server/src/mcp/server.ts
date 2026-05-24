@@ -32,6 +32,9 @@ export class MCPServer {
   private telegramBridgeSecret: string;
   private instagramUrl: string;
   private connectorSecret: string;
+  // Per-account connector routing (personal / professional).
+  private waUrls!: Record<string, string>;
+  private tgUrls!: Record<string, string>;
 
   constructor(
     dbClient: Pool,
@@ -81,6 +84,19 @@ export class MCPServer {
     this.instagramUrl = process.env.INSTAGRAM_CONNECTOR_URL || 'http://instagram-connector:3003';
     this.connectorSecret = _connectorSharedSecret;
 
+    // Account routing. WhatsApp: personal = web (baileys), professional = cloud
+    // (official API). Telegram: two separate connector instances.
+    this.waUrls = {
+      personal: process.env.WHATSAPP_PERSONAL_URL || this.connectorUrl,
+      professional:
+        process.env.WHATSAPP_PROFESSIONAL_URL || 'http://whatsapp-cloud-connector:3004',
+    };
+    this.tgUrls = {
+      personal: process.env.TELEGRAM_PERSONAL_URL || this.telegramUrl,
+      professional:
+        process.env.TELEGRAM_PROFESSIONAL_URL || 'http://telegram-connector-professional:3002',
+    };
+
     this.logger = pino({
       transport: {
         target: 'pino-pretty',
@@ -89,6 +105,44 @@ export class MCPServer {
     });
 
     this.setupHandlers();
+  }
+
+  /** WhatsApp connector URL for an account (personal = web, professional = cloud). */
+  private waUrl(account?: string): string {
+    return this.waUrls[account === 'professional' ? 'professional' : 'personal'];
+  }
+
+  /** Telegram connector URL for an account (separate instance per account). */
+  private tgUrl(account?: string): string {
+    return this.tgUrls[account === 'professional' ? 'professional' : 'personal'];
+  }
+
+  /**
+   * Reject tools that only the WhatsApp web (personal) connector implements when
+   * targeting the professional (Cloud) account, which only supports
+   * send/react/read/template/image/audio.
+   */
+  private assertWaCapability(account: string | undefined, tool: string): void {
+    const webOnly = new Set([
+      'send_file',
+      'download_media',
+      'forward_message',
+      'delete_message',
+      'get_me',
+      'get_unread_chats',
+      'get_group_info',
+      'get_group_participants',
+      'repair_group_session',
+      'renew_qr_code',
+      'get_connection_status',
+      'history_status',
+    ]);
+    if (account === 'professional' && webOnly.has(tool)) {
+      throw new McpError(
+        ErrorCode.InvalidRequest,
+        `Tool "${tool}" is not supported on the professional (WhatsApp Cloud) account; it is web-only.`
+      );
+    }
   }
 
   private setupHandlers(): void {
@@ -1764,7 +1818,7 @@ export class MCPServer {
     }
   }
 
-  private async handleSendMessage(args: { chatId: string; text: string }) {
+  private async handleSendMessage(args: { chatId: string; text: string; account?: string }) {
     if (process.env.ENABLE_SENDING !== 'true') {
       throw new McpError(ErrorCode.InvalidRequest, 'Sending is disabled (ENABLE_SENDING != true)');
     }
@@ -1772,7 +1826,7 @@ export class MCPServer {
       throw new McpError(ErrorCode.InvalidRequest, 'Sending is emergency disabled');
     }
 
-    const connectorUrl = process.env.CONNECTOR_URL || 'http://whatsapp-connector:3001';
+    const connectorUrl = this.waUrl(args.account);
     const sharedSecret = process.env.CONNECTOR_SHARED_SECRET || '';
     const timestamp = Math.floor(Date.now() / 1000);
     const body = {
@@ -2091,9 +2145,9 @@ export class MCPServer {
     };
   }
 
-  private async handleTelegramSendMessage(args: { chatId: string; text: string }) {
+  private async handleTelegramSendMessage(args: { chatId: string; text: string; account?: string }) {
     const data = await this.connectorCall(
-      this.telegramUrl,
+      this.tgUrl(args.account),
       'POST',
       `/api/v1/messages/${args.chatId}`,
       { text: args.text }
@@ -2106,8 +2160,9 @@ export class MCPServer {
     filePath: string;
     caption?: string;
     voiceNote?: boolean;
+    account?: string;
   }) {
-    const data = await this.connectorCall(this.telegramUrl, 'POST', '/api/v1/messages/media/send', {
+    const data = await this.connectorCall(this.tgUrl(args.account), 'POST', '/api/v1/messages/media/send', {
       chatId: args.chatId,
       filePath: args.filePath,
       caption: args.caption,
@@ -2187,8 +2242,9 @@ export class MCPServer {
     fromChatId: string;
     messageId: string;
     toChatId: string;
+    account?: string;
   }) {
-    const data = await this.connectorCall(this.telegramUrl, 'POST', '/api/v1/messages/forward', {
+    const data = await this.connectorCall(this.tgUrl(args.account), 'POST', '/api/v1/messages/forward', {
       fromChatId: args.fromChatId,
       messageId: args.messageId,
       toChatId: args.toChatId,
@@ -2196,18 +2252,18 @@ export class MCPServer {
     return this.jsonResponse(data);
   }
 
-  private async handleTelegramDeleteMessage(args: { chatId: string; messageId: string }) {
+  private async handleTelegramDeleteMessage(args: { chatId: string; messageId: string; account?: string }) {
     const data = await this.connectorCall(
-      this.telegramUrl,
+      this.tgUrl(args.account),
       'DELETE',
       `/api/v1/messages/${args.chatId}/${args.messageId}`
     );
     return this.jsonResponse(data);
   }
 
-  private async handleTelegramMarkAsRead(args: { chatId: string }) {
+  private async handleTelegramMarkAsRead(args: { chatId: string; account?: string }) {
     const data = await this.connectorCall(
-      this.telegramUrl,
+      this.tgUrl(args.account),
       'POST',
       `/api/v1/messages/read/${args.chatId}`
     );
@@ -2267,9 +2323,9 @@ export class MCPServer {
     return this.jsonResponse(await resp.json());
   }
 
-  private async handleTelegramDownloadMedia(args: { chatId: string; messageId: string }) {
+  private async handleTelegramDownloadMedia(args: { chatId: string; messageId: string; account?: string }) {
     const data = await this.connectorCall(
-      this.telegramUrl,
+      this.tgUrl(args.account),
       'GET',
       `/api/v1/messages/media/${args.chatId}/${args.messageId}`
     );

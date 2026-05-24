@@ -28,6 +28,8 @@ export interface MessageReceivedEvent {
   }>;
   isForwarded: boolean;
   replyToWaId?: string;
+  /** Owning account: 'personal' | 'professional'. Defaults to 'personal'. */
+  account?: string;
 }
 
 export interface MessageUpdatedEvent {

@@ -9,6 +9,16 @@ import asyncpg
 
 logger = logging.getLogger(__name__)
 
+# This sync instance serves exactly one account ("personal" by default,
+# "professional" for the second instance). Non-personal row ids are namespaced
+# ("<account>:<id>") so two Telegram accounts never merge in the shared tables.
+ACCOUNT = os.environ.get("CONNECTOR_ACCOUNT", "personal")
+
+
+def account_key(raw_id: str) -> str:
+    return raw_id if ACCOUNT == "personal" else f"{ACCOUNT}:{raw_id}"
+
+
 # Only sync_state is owned by telegram-sync; messages/conversations/participants already exist
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS telegram_sync_state (
@@ -27,8 +37,8 @@ WHERE platform = 'telegram'
 """
 
 ENSURE_CONVERSATION_SQL = """
-INSERT INTO conversations (id, name, is_group, type, wa_chat_id, created_at, updated_at, last_message_at)
-VALUES ($1, $2, $3, $4, $1, NOW(), NOW(), $5)
+INSERT INTO conversations (id, name, is_group, type, wa_chat_id, created_at, updated_at, last_message_at, account)
+VALUES ($1, $2, $3, $4, $6, NOW(), NOW(), $5, $7)
 ON CONFLICT (id) DO UPDATE SET
   name = COALESCE(EXCLUDED.name, conversations.name),
   last_message_at = GREATEST(conversations.last_message_at, EXCLUDED.last_message_at),
@@ -36,8 +46,8 @@ ON CONFLICT (id) DO UPDATE SET
 """
 
 ENSURE_PARTICIPANT_SQL = """
-INSERT INTO participants (id, name, first_seen, last_seen)
-VALUES ($1, $2, NOW(), NOW())
+INSERT INTO participants (id, name, first_seen, last_seen, account)
+VALUES ($1, $2, NOW(), NOW(), $3)
 ON CONFLICT (id) DO UPDATE SET
   name = COALESCE(EXCLUDED.name, participants.name),
   last_seen = NOW()
@@ -53,8 +63,8 @@ INSERT_MESSAGE_SQL = """
 INSERT INTO messages (
     wa_message_id, conversation_id, sender_wa_id, wa_timestamp,
     direction, content, message_type, is_forwarded,
-    reply_to_message_id, platform, metadata
-) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'telegram',$10)
+    reply_to_message_id, platform, metadata, account
+) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'telegram',$10,$11)
 ON CONFLICT (wa_message_id) DO NOTHING
 RETURNING id
 """
@@ -123,11 +133,12 @@ async def insert_message(
 ) -> int | None:
     """Insert a message into unified table. Returns the bigint message_id if inserted,
     or the existing id if duplicate (lookup by wa_message_id)."""
-    conv_id = f"tg_{chat_id}"
-    wa_msg_id = f"tg_{chat_id}_{telegram_message_id}"
-    sender_wa_id = f"tg_{sender_id}" if sender_id else None
+    raw_conv_id = f"tg_{chat_id}"
+    conv_id = account_key(raw_conv_id)
+    wa_msg_id = account_key(f"tg_{chat_id}_{telegram_message_id}")
+    sender_wa_id = account_key(f"tg_{sender_id}") if sender_id else None
     is_group = chat_type in ("group", "supergroup")
-    reply_ref = f"tg_{chat_id}_{reply_to_message_id}" if reply_to_message_id else None
+    reply_ref = account_key(f"tg_{chat_id}_{reply_to_message_id}") if reply_to_message_id else None
 
     metadata = {
         "telegram_chat_id": chat_id,
@@ -142,15 +153,15 @@ async def insert_message(
 
     async with pool.acquire() as conn:
         async with conn.transaction():
-            await conn.execute(ENSURE_CONVERSATION_SQL, conv_id, chat_title, is_group, chat_type, timestamp)
+            await conn.execute(ENSURE_CONVERSATION_SQL, conv_id, chat_title, is_group, chat_type, timestamp, raw_conv_id, ACCOUNT)
             if sender_id:
-                await conn.execute(ENSURE_PARTICIPANT_SQL, sender_wa_id, sender_name)
+                await conn.execute(ENSURE_PARTICIPANT_SQL, sender_wa_id, sender_name, ACCOUNT)
                 await conn.execute(LINK_PARTICIPANT_SQL, conv_id, sender_wa_id)
             new_id = await conn.fetchval(
                 INSERT_MESSAGE_SQL,
                 wa_msg_id, conv_id, sender_wa_id, timestamp,
                 direction.upper(), content, message_type.upper(),
-                is_forwarded, reply_ref, json.dumps(metadata),
+                is_forwarded, reply_ref, json.dumps(metadata), ACCOUNT,
             )
             if new_id is not None:
                 return int(new_id)

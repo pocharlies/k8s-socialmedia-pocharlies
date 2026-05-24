@@ -14,9 +14,11 @@ export class DatabaseRepository {
     waChatId: string,
     type: ConversationType,
     name: string | null = null,
-    avatarUrl: string | null = null
+    avatarUrl: string | null = null,
+    account: string = 'personal',
+    rawWaChatId: string | null = null
   ): Promise<Conversation> {
-    // conversations.id IS the wa_chat_id in this schema
+    // conversations.id IS the (account-namespaced) wa_chat_id in this schema
     const result = await this.client.query(`SELECT * FROM conversations WHERE id = $1`, [waChatId]);
 
     if (result.rows.length > 0) {
@@ -37,11 +39,12 @@ export class DatabaseRepository {
     const conversation = Conversation.create(waChatId, type, name, avatarUrl);
     // Use waChatId as the id (since id = wa_chat_id in this schema)
     await this.client.query(
-      `INSERT INTO conversations (id, wa_chat_id, type, name, is_group, avatar_url, created_at, updated_at, metadata)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      `INSERT INTO conversations (id, wa_chat_id, type, name, is_group, avatar_url, created_at, updated_at, metadata, account)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       ON CONFLICT (id) DO NOTHING`,
       [
         waChatId,
-        waChatId,
+        rawWaChatId ?? waChatId,
         type,
         name,
         type === ConversationType.GROUP,
@@ -49,6 +52,7 @@ export class DatabaseRepository {
         new Date(),
         new Date(),
         conversation.metadata || {},
+        account,
       ]
     );
 
@@ -69,7 +73,8 @@ export class DatabaseRepository {
     conversationId: string,
     waUserId: string,
     name: string | null = null,
-    _isAdmin: boolean = false
+    _isAdmin: boolean = false,
+    account: string = 'personal'
   ): Promise<Participant> {
     // Check if participant exists in participants table (id = waUserId)
     const result = await this.client.query(
@@ -95,10 +100,10 @@ export class DatabaseRepository {
 
     // Insert into participants if not exists
     await this.client.query(
-      `INSERT INTO participants (id, name, phone, first_seen, last_seen)
-       VALUES ($1, $2, $3, NOW(), NOW())
+      `INSERT INTO participants (id, name, phone, first_seen, last_seen, account)
+       VALUES ($1, $2, $3, NOW(), NOW(), $4)
        ON CONFLICT (id) DO UPDATE SET last_seen = NOW(), name = COALESCE(EXCLUDED.name, participants.name)`,
-      [waUserId, name, waUserId.replace('@c.us', '').replace('@s.whatsapp.net', '')]
+      [waUserId, name, waUserId.replace('@c.us', '').replace('@s.whatsapp.net', ''), account]
     );
 
     // Insert into conversation_participants junction
@@ -115,15 +120,16 @@ export class DatabaseRepository {
   async saveMessage(
     message: Message,
     _encryptedContent: string,
-    _encryptedPayload: Buffer | null
+    _encryptedPayload: Buffer | null,
+    account: string = 'personal'
   ): Promise<void> {
     // Use plaintext content directly (no encryption in this schema)
     await this.client.query(
       `INSERT INTO messages (
         conversation_id, wa_message_id, sender_wa_id, wa_timestamp, direction,
         content, message_type, is_forwarded, is_edited, is_deleted,
-        reply_to_message_id, platform, metadata
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        reply_to_message_id, platform, metadata, account
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
       ON CONFLICT (wa_message_id) DO NOTHING`,
       [
         message.conversationId,
@@ -139,6 +145,7 @@ export class DatabaseRepository {
         message.replyToMessageId,
         'whatsapp',
         {},
+        account,
       ]
     );
   }

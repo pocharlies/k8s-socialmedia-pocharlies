@@ -54,6 +54,7 @@ export class WhatsAppCloudPublisher {
       attachments: message.attachments,
       isForwarded: message.isForwarded,
       replyToWaId: message.replyToWaId,
+      account: process.env.CONNECTOR_ACCOUNT || 'personal',
     };
 
     try {

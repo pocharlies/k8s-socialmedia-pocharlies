@@ -13,6 +13,7 @@ import {
   MessageUpdatedEvent,
   ChatUpdatedEvent,
 } from '@mcp-socialmedia/shared';
+import { accountKey, normalizeAccount } from '../domain/account';
 import pino from 'pino';
 
 export class MessageIngestionService {
@@ -31,21 +32,35 @@ export class MessageIngestionService {
 
   async handleMessageReceived(event: MessageReceivedEvent): Promise<void> {
     try {
-      // Determine conversation type
+      // Account scoping: ids for non-personal accounts are namespaced so two
+      // accounts talking to the same contact don't merge. Personal stays bare.
+      const account = normalizeAccount(event.account);
+      const convId = accountKey(account, event.conversationId);
+      const senderId = accountKey(account, event.senderWaId);
+      const wamId = accountKey(account, event.waMessageId);
+
+      // Determine conversation type (use the raw chat id for the @g.us check)
       const conversationType = event.conversationId.includes('@g.us')
         ? ConversationType.GROUP
         : ConversationType.INDIVIDUAL;
 
-      // Find or create conversation
+      // Find or create conversation (id = namespaced; wa_chat_id = raw)
       const conversation = await this.repository.findOrCreateConversation(
-        event.conversationId,
-        conversationType
+        convId,
+        conversationType,
+        null,
+        null,
+        account,
+        event.conversationId
       );
 
       // Find or create participant
       const participant = await this.repository.findOrCreateParticipant(
         conversation.id,
-        event.senderWaId
+        senderId,
+        null,
+        false,
+        account
       );
 
       // Map message type
@@ -54,10 +69,10 @@ export class MessageIngestionService {
       // Create message entity
       const message = Message.create(
         conversation.id,
-        event.waMessageId,
+        wamId,
         new Date(event.waTimestamp),
         MessageDirection.INBOUND,
-        event.senderWaId,
+        senderId,
         event.content,
         messageType,
         event.isForwarded,
@@ -66,7 +81,7 @@ export class MessageIngestionService {
       );
 
       // Save message with plaintext content (no encryption)
-      await this.repository.saveMessage(message, event.content || '', null);
+      await this.repository.saveMessage(message, event.content || '', null, account);
 
       // Save attachments if any
       if (event.attachments) {
