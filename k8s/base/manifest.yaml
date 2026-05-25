@@ -520,7 +520,7 @@ metadata:
   name: telegram-connector-professional
   namespace: whatsapp-mcp
 spec:
-  replicas: 1
+  replicas: 0  # paused: professional session currently points to the personal account (paxanguero); awaiting regeneration with the real professional account
   selector: { matchLabels: { app: telegram-connector-professional } }
   template:
     metadata: { labels: { app: telegram-connector-professional } }
@@ -555,7 +555,7 @@ metadata:
   name: telegram-sync-professional
   namespace: whatsapp-mcp
 spec:
-  replicas: 1
+  replicas: 0  # paused: see telegram-connector-professional
   selector: { matchLabels: { app: telegram-sync-professional } }
   template:
     metadata: { labels: { app: telegram-sync-professional } }
