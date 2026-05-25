@@ -15,6 +15,12 @@ describe('account helpers', () => {
     expect(accountKey('personal', 'x')).not.toBe(accountKey('professional', 'x'));
   });
 
+  it('accountKey is idempotent (never double-prefixes an already-namespaced id)', () => {
+    expect(accountKey('professional', 'professional:tg_123')).toBe('professional:tg_123');
+    expect(accountKey('professional', accountKey('professional', 'tg_123'))).toBe('professional:tg_123');
+    expect(accountKey('personal', 'tg_123')).toBe('tg_123');
+  });
+
   it('round-trips accountKey <-> stripAccount for every account', () => {
     for (const a of ACCOUNTS) {
       const raw = 'tg_999_42';

@@ -20,7 +20,7 @@ spec:
     spec:
       containers:
         - name: whatsapp-cloud-connector
-          image: harbor.e-dani.com/homelab/whatsappmcp-whatsapp-cloud-connector:v1.3.12@sha256:77129373fc7f5e7b2417c50e9ac6674b3ea90c5cfb9bd2aacadd09e4d9d8fd6a
+          image: harbor.e-dani.com/homelab/whatsappmcp-whatsapp-cloud-connector:v1.3.15@sha256:b86e07fa06f10d71c7dcb94a789ae73e98327a7635428f6ddf3409d2defcb2fa
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -56,7 +56,7 @@ spec:
     spec:
       containers:
         - name: mcp-server
-          image: harbor.e-dani.com/homelab/whatsappmcp-mcp-server:v1.3.12@sha256:2a1b075bc3088644e558661780bde209c43953ca6c7ccd562cad947459d84103
+          image: harbor.e-dani.com/homelab/whatsappmcp-mcp-server:v1.3.15@sha256:46a8f135ade159ac87cc254787d4ff0b13e633b8ca62e488170b1806f0c23065
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -68,4 +68,4 @@ spec:
     spec:
       containers:
         - name: telegram-sync
-          image: harbor.e-dani.com/homelab/whatsappmcp-telegram-sync:latest
+          image: harbor.e-dani.com/homelab/whatsappmcp-telegram-sync:v1.3.15@sha256:a40eec2c9718d5712e4c8c4a629c2f8851478c163e9e694b212997e21fef389e

@@ -270,6 +270,8 @@ spec:
           ports: [{ name: http, containerPort: 3004 }]
           env:
             - { name: NATS_URL, value: "nats://whatsapp-mcp-nats.whatsapp-mcp.svc.cluster.local:4222" }
+            # professional account → published events carry account=professional
+            - { name: CONNECTOR_ACCOUNT, value: "professional" }
           envFrom: [{ secretRef: { name: whatsapp-mcp-secrets } }]
           resources:
             requests: { cpu: 30m, memory: 64Mi }
@@ -361,7 +363,9 @@ spec:
       containers:
         - name: mcp-server
           image: harbor.e-dani.com/homelab/whatsappmcp-mcp-server:latest
-          command: ["sh", "-c", "cd mcp-server && pnpm start"]
+          # run from source via tsx (same pattern as the connectors; the image
+          # ships source, not a compiled dist)
+          command: ["sh", "-c", "cd mcp-server && tsx src/main.ts"]
           ports: [{ name: http, containerPort: 3000 }]
           env:
             - { name: NATS_URL, value: "nats://whatsapp-mcp-nats.whatsapp-mcp.svc.cluster.local:4222" }
@@ -409,7 +413,7 @@ spec:
       containers:
         - name: mcp-sse
           image: harbor.e-dani.com/homelab/whatsappmcp-mcp-server:latest
-          command: ["sh", "-c", "cd mcp-server && pnpm start:sse"]
+          command: ["sh", "-c", "cd mcp-server && tsx src/mcp/sse-server.ts"]
           ports:
             - { name: sse, containerPort: 3010, hostPort: 3010 }
           env:
@@ -503,4 +507,83 @@ kind: Service
 metadata: { name: telegram-sync, namespace: whatsapp-mcp }
 spec:
   selector: { app: telegram-sync }
+  ports: [{ name: http, port: 3080, targetPort: 3080 }]
+---
+# === Professional account: second Telegram instance pair ===
+# Same images as the personal instances; CONNECTOR_ACCOUNT=professional makes
+# telegram-sync namespace its DB ids ("professional:tg_...") and the MCP routes
+# professional Telegram actions/unread here via the code defaults
+# (telegram-connector-professional:3002 / telegram-sync-professional:3080).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: telegram-connector-professional
+  namespace: whatsapp-mcp
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: telegram-connector-professional } }
+  template:
+    metadata: { labels: { app: telegram-connector-professional } }
+    spec:
+      enableServiceLinks: false
+      nodeSelector: { topology: lan, kubernetes.io/arch: amd64 }
+      containers:
+        - name: telegram-connector
+          image: harbor.e-dani.com/homelab/whatsappmcp-telegram-connector:latest
+          ports: [{ name: http, containerPort: 3002 }]
+          env:
+            - { name: NATS_URL, value: "nats://whatsapp-mcp-nats.whatsapp-mcp.svc.cluster.local:4222" }
+            - { name: CONNECTOR_ACCOUNT, value: "professional" }
+            # override the personal session loaded via envFrom with the professional one
+            - name: TELEGRAM_SESSION_STRING
+              valueFrom: { secretKeyRef: { name: whatsapp-mcp-secrets, key: TELEGRAM_SESSION_STRING_PROFESSIONAL } }
+          envFrom: [{ secretRef: { name: whatsapp-mcp-secrets } }]
+          resources:
+            requests: { cpu: 30m, memory: 64Mi }
+            limits:   { memory: 256Mi }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: telegram-connector-professional, namespace: whatsapp-mcp }
+spec:
+  selector: { app: telegram-connector-professional }
+  ports: [{ name: http, port: 3002, targetPort: 3002 }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: telegram-sync-professional
+  namespace: whatsapp-mcp
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: telegram-sync-professional } }
+  template:
+    metadata: { labels: { app: telegram-sync-professional } }
+    spec:
+      enableServiceLinks: false
+      nodeSelector: { topology: lan, kubernetes.io/arch: amd64 }
+      containers:
+        - name: telegram-sync
+          image: harbor.e-dani.com/homelab/whatsappmcp-telegram-sync:latest
+          ports: [{ name: http, containerPort: 3080 }]
+          env:
+            - { name: NATS_URL, value: "nats://whatsapp-mcp-nats.whatsapp-mcp.svc.cluster.local:4222" }
+            - { name: DATABASE_URL, value: "postgresql://$(DB_USER):$(DB_PASSWORD)@postgres-shared-rw.databases.svc.cluster.local:5432/whatsappmcp" }
+            - { name: CONNECTOR_ACCOUNT, value: "professional" }
+            - name: TELEGRAM_SESSION_STRING
+              valueFrom: { secretKeyRef: { name: whatsapp-mcp-secrets, key: TELETHON_SESSION_STRING_PROFESSIONAL } }
+            - { name: MINIO_ENDPOINT, value: "whatsapp-mcp-minio.whatsapp-mcp.svc.cluster.local:9000" }
+            - { name: MINIO_ACCESS_KEY, value: "$(MINIO_ROOT_USER)" }
+            - { name: MINIO_SECRET_KEY, value: "$(MINIO_ROOT_PASSWORD)" }
+            - { name: MINIO_USE_SSL, value: "false" }
+          envFrom: [{ secretRef: { name: whatsapp-mcp-secrets } }]
+          resources:
+            requests: { cpu: 100m, memory: 512Mi }
+            limits:   { memory: 2Gi }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: telegram-sync-professional, namespace: whatsapp-mcp }
+spec:
+  selector: { app: telegram-sync-professional }
   ports: [{ name: http, port: 3080, targetPort: 3080 }]

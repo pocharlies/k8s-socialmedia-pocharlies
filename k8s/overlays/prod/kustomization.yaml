@@ -11,16 +11,17 @@ images:
     newTag: v1.3.14
     digest: sha256:7bbc8db4958a2a1e29cf26001dbb621294b7b588d829cc95f087b7d90e78a7f3
   - name: harbor.e-dani.com/homelab/whatsappmcp-whatsapp-cloud-connector
-    newTag: v1.3.12
-    digest: sha256:77129373fc7f5e7b2417c50e9ac6674b3ea90c5cfb9bd2aacadd09e4d9d8fd6a
+    newTag: v1.3.15
+    digest: sha256:b86e07fa06f10d71c7dcb94a789ae73e98327a7635428f6ddf3409d2defcb2fa
   - name: harbor.e-dani.com/homelab/whatsappmcp-telegram-connector
     newTag: v1.3.13
     digest: sha256:481b56759a60808f4715c7bacf67800e4e584c1f8b402dddd028f6cfbab318a3
   - name: harbor.e-dani.com/homelab/whatsappmcp-telegram-sync
-    newTag: latest
+    newTag: v1.3.15
+    digest: sha256:a40eec2c9718d5712e4c8c4a629c2f8851478c163e9e694b212997e21fef389e
   - name: harbor.e-dani.com/homelab/whatsappmcp-instagram-connector
     newTag: v1.3.12
     digest: sha256:33d980dc270af8a6942a762c122428712250714e35003f7435e7f47d2f91aa07
   - name: harbor.e-dani.com/homelab/whatsappmcp-mcp-server
-    newTag: v1.3.12
-    digest: sha256:2a1b075bc3088644e558661780bde209c43953ca6c7ccd562cad947459d84103
+    newTag: v1.3.15
+    digest: sha256:46a8f135ade159ac87cc254787d4ff0b13e633b8ca62e488170b1806f0c23065

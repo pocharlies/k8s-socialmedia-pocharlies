@@ -1,6 +1,7 @@
 import { Pool } from 'pg';
 import OpenAI from 'openai';
 import pino from 'pino';
+import { accountKey, normalizeAccount } from '../domain/account';
 
 export interface SearchResult {
   messageId: string;
@@ -18,6 +19,8 @@ export interface SearchOptions {
   to?: Date;
   sender?: string;
   limit?: number;
+  /** Account scope (personal|professional). Defaults to personal. */
+  account?: string;
 }
 
 export class SearchService {
@@ -65,7 +68,7 @@ export class SearchService {
     if (chatId) {
       // conversations.id IS the wa_chat_id
       sql += ` AND m.conversation_id = $${paramIndex}`;
-      params.push(chatId);
+      params.push(accountKey(normalizeAccount(options.account), chatId));
       paramIndex++;
     }
 
@@ -83,9 +86,13 @@ export class SearchService {
 
     if (sender) {
       sql += ` AND m.sender_wa_id = $${paramIndex}`;
-      params.push(sender);
+      params.push(accountKey(normalizeAccount(options.account), sender));
       paramIndex++;
     }
+
+    sql += ` AND m.account = $${paramIndex}`;
+    params.push(normalizeAccount(options.account));
+    paramIndex++;
 
     sql += ` ORDER BY rank DESC, m.wa_timestamp DESC LIMIT $${paramIndex}`;
     params.push(limit);
@@ -136,7 +143,7 @@ export class SearchService {
 
     if (chatId) {
       sql += ` AND m.conversation_id = $${paramIndex}`;
-      params.push(chatId);
+      params.push(accountKey(normalizeAccount(options.account), chatId));
       paramIndex++;
     }
 
@@ -154,9 +161,13 @@ export class SearchService {
 
     if (sender) {
       sql += ` AND m.sender_wa_id = $${paramIndex}`;
-      params.push(sender);
+      params.push(accountKey(normalizeAccount(options.account), sender));
       paramIndex++;
     }
+
+    sql += ` AND m.account = $${paramIndex}`;
+    params.push(normalizeAccount(options.account));
+    paramIndex++;
 
     sql += ` ORDER BY similarity DESC, m.wa_timestamp DESC LIMIT $${paramIndex}`;
     params.push(limit);

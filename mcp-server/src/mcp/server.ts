@@ -14,6 +14,7 @@ import { DraftService } from '../application/draft.service';
 import { DatabaseRepository } from '../infrastructure/database/repository';
 import { ConversationType } from '../domain/entities/conversation.entity';
 import { generateHMACSignature } from '@mcp-socialmedia/shared';
+import { accountKey, normalizeAccount, stripAccount, type Account } from '../domain/account';
 import { createHmac } from 'crypto';
 import { t } from '../infrastructure/i18n/i18n';
 import pino from 'pino';
@@ -35,6 +36,7 @@ export class MCPServer {
   // Per-account connector routing (personal / professional).
   private waUrls!: Record<string, string>;
   private tgUrls!: Record<string, string>;
+  private tgBridgeUrls!: Record<string, string>;
 
   constructor(
     dbClient: Pool,
@@ -96,6 +98,12 @@ export class MCPServer {
       professional:
         process.env.TELEGRAM_PROFESSIONAL_URL || 'http://telegram-connector-professional:3002',
     };
+    // Telethon bridge (live unread) is per-account, served by each telegram-sync instance.
+    this.tgBridgeUrls = {
+      personal: this.telegramBridgeUrl,
+      professional:
+        process.env.TELEGRAM_BRIDGE_PROFESSIONAL_URL || 'http://telegram-sync-professional:3080',
+    };
 
     this.logger = pino({
       transport: {
@@ -117,6 +125,11 @@ export class MCPServer {
     return this.tgUrls[account === 'professional' ? 'professional' : 'personal'];
   }
 
+  /** Telegram-sync (Telethon) bridge URL for an account — used by live unread. */
+  private tgBridgeUrl(account?: string): string {
+    return this.tgBridgeUrls[account === 'professional' ? 'professional' : 'personal'];
+  }
+
   /**
    * Reject tools that only the WhatsApp web (personal) connector implements when
    * targeting the professional (Cloud) account, which only supports
@@ -135,7 +148,7 @@ export class MCPServer {
       'repair_group_session',
       'renew_qr_code',
       'get_connection_status',
-      'history_status',
+      'whatsapp_history_status',
     ]);
     if (account === 'professional' && webOnly.has(tool)) {
       throw new McpError(
@@ -1043,6 +1056,9 @@ export class MCPServer {
       const { name, arguments: args } = request.params;
 
       try {
+        // Reject WhatsApp web-only tools when targeting the professional (Cloud)
+        // account. No-op for personal and for any non-web-only tool.
+        this.assertWaCapability(normalizeAccount((args as any)?.account), name);
         switch (name) {
           case 'search_messages':
             return await this.handleSearchMessages(args as any);
@@ -1121,7 +1137,7 @@ export class MCPServer {
           case 'telegram_mark_as_read':
             return await this.handleTelegramMarkAsRead(args as any);
           case 'telegram_get_dialogs':
-            return await this.handleTelegramGetDialogs();
+            return await this.handleTelegramGetDialogs(args as any);
           case 'telegram_get_unread':
             return await this.handleTelegramGetUnread(args as any);
           case 'telegram_download_media':
@@ -1201,6 +1217,7 @@ export class MCPServer {
     to?: string;
     sender?: string;
     limit?: number;
+    account?: string;
   }) {
     const results = await this.searchService.search(args.query, {
       chatId: args.chatId,
@@ -1208,6 +1225,7 @@ export class MCPServer {
       to: args.to ? new Date(args.to) : undefined,
       sender: args.sender,
       limit: args.limit || 20,
+      account: args.account,
     });
 
     return {
@@ -1234,10 +1252,12 @@ export class MCPServer {
     };
   }
 
-  private async handleGetChat(args: { chatId: string }) {
+  private async handleGetChat(args: { chatId: string; account?: string }) {
+    const account = normalizeAccount(args.account);
+    const chatId = accountKey(account, args.chatId);
     // conversations.id IS the wa_chat_id
     const convResult = await this.dbClient.query(`SELECT * FROM conversations WHERE id = $1`, [
-      args.chatId,
+      chatId,
     ]);
 
     let conversation;
@@ -1252,8 +1272,12 @@ export class MCPServer {
     } else {
       // Create if not found
       const conv = await this.repository.findOrCreateConversation(
-        args.chatId,
-        args.chatId.includes('@g.us') ? ConversationType.GROUP : ConversationType.INDIVIDUAL
+        chatId,
+        args.chatId.includes('@g.us') ? ConversationType.GROUP : ConversationType.INDIVIDUAL,
+        null,
+        null,
+        account,
+        args.chatId
       );
       conversation = {
         id: conv.id,
@@ -1268,7 +1292,7 @@ export class MCPServer {
        WHERE conversation_id = $1
        ORDER BY wa_timestamp DESC
        LIMIT 50`,
-      [args.chatId]
+      [chatId]
     );
 
     return {
@@ -1326,14 +1350,16 @@ export class MCPServer {
     order?: 'asc' | 'desc';
     includeMetadata?: boolean;
     includeAttachments?: boolean;
+    account?: string;
   }) {
     const limit = Math.max(1, Math.min(args.limit || 100, 500));
     const order = args.order === 'asc' ? 'ASC' : 'DESC';
-    const before = await this.resolveWhatsAppCursor(args.chatId, args.before);
-    const after = await this.resolveWhatsAppCursor(args.chatId, args.after);
+    const chatId = accountKey(normalizeAccount(args.account), args.chatId);
+    const before = await this.resolveWhatsAppCursor(chatId, args.before);
+    const after = await this.resolveWhatsAppCursor(chatId, args.after);
 
     const where = [`conversation_id = $1`, `platform = 'whatsapp'`];
-    const params: any[] = [args.chatId];
+    const params: any[] = [chatId];
 
     if (before) {
       params.push(before.timestamp);
@@ -1992,8 +2018,12 @@ export class MCPServer {
     }
   }
 
-  private async handleSearchUsers(args: { query: string; limit?: number }) {
-    const results = await this.repository.searchParticipants(args.query, args.limit || 20);
+  private async handleSearchUsers(args: { query: string; limit?: number; account?: string }) {
+    const results = await this.repository.searchParticipants(
+      args.query,
+      args.limit || 20,
+      normalizeAccount(args.account)
+    );
 
     const usersMap = new Map<
       string,
@@ -2043,12 +2073,14 @@ export class MCPServer {
     query?: string;
     limit?: number;
     includeParticipants?: boolean;
+    account?: string;
   }) {
     const conversations = await this.repository.listConversations({
       type: args.type,
       query: args.query,
       limit: args.limit || 20,
       includeParticipants: args.includeParticipants !== false,
+      account: args.account,
     });
 
     return {
@@ -2086,15 +2118,21 @@ export class MCPServer {
     from?: string;
     to?: string;
     limit?: number;
+    account?: string;
   }) {
-    const userInfo = await this.repository.getUserInfo(args.waUserId);
+    const account = normalizeAccount(args.account);
+    const userInfo = await this.repository.getUserInfo(args.waUserId, account);
 
-    const messages = await this.repository.getMessagesByUser(args.waUserId, {
-      conversationId: args.conversationId,
-      from: args.from ? new Date(args.from) : undefined,
-      to: args.to ? new Date(args.to) : undefined,
-      limit: args.limit || 50,
-    });
+    const messages = await this.repository.getMessagesByUser(
+      args.waUserId,
+      {
+        conversationId: args.conversationId,
+        from: args.from ? new Date(args.from) : undefined,
+        to: args.to ? new Date(args.to) : undefined,
+        limit: args.limit || 50,
+      },
+      account
+    );
 
     // No decryption needed - content is plaintext
     return {
@@ -2176,14 +2214,17 @@ export class MCPServer {
    * Accepts `tg_xxx` (returned as-is), bare numeric ids like `-1003749364241`
    * or `1629757854` (prefixed), or `@username` (resolved via DB metadata).
    */
-  private async resolveTelegramChatId(chatId: string): Promise<string | null> {
-    if (chatId.startsWith('tg_')) return chatId;
-    if (/^-?\d+$/.test(chatId)) return `tg_${chatId}`;
+  private async resolveTelegramChatId(
+    chatId: string,
+    account: Account = 'personal'
+  ): Promise<string | null> {
+    if (chatId.startsWith('tg_')) return accountKey(account, chatId);
+    if (/^-?\d+$/.test(chatId)) return accountKey(account, `tg_${chatId}`);
     if (chatId.startsWith('@')) {
       const username = chatId.slice(1).toLowerCase();
       const r = await this.dbClient.query(
-        `SELECT id FROM conversations WHERE id LIKE 'tg_%' AND lower(metadata->>'username') = $1 LIMIT 1`,
-        [username]
+        `SELECT id FROM conversations WHERE id LIKE $2 AND lower(metadata->>'username') = $1 LIMIT 1`,
+        [username, accountKey(account, 'tg_') + '%']
       );
       return r.rows[0]?.id ?? null;
     }
@@ -2194,8 +2235,9 @@ export class MCPServer {
     chatId: string;
     limit?: number;
     offsetId?: number;
+    account?: string;
   }) {
-    const id = await this.resolveTelegramChatId(args.chatId);
+    const id = await this.resolveTelegramChatId(args.chatId, normalizeAccount(args.account));
     if (!id)
       throw new McpError(
         ErrorCode.InvalidParams,
@@ -2270,21 +2312,23 @@ export class MCPServer {
     return this.jsonResponse(data);
   }
 
-  private async handleTelegramGetDialogs() {
+  private async handleTelegramGetDialogs(args?: { account?: string }) {
+    const account = normalizeAccount(args?.account);
     const result = await this.dbClient.query(
       `SELECT c.id, c.name, c.type, c.is_group, c.last_message_at, c.metadata,
               (SELECT count(*)::int FROM messages WHERE conversation_id = c.id) AS message_count
          FROM conversations c
-        WHERE c.id LIKE 'tg_%'
+        WHERE c.id LIKE $1
         ORDER BY c.last_message_at DESC NULLS LAST
-        LIMIT 1000`
+        LIMIT 1000`,
+      [accountKey(account, 'tg_') + '%']
     );
     return this.jsonResponse({
       source: 'db',
       count: result.rows.length,
       dialogs: result.rows.map((c: any) => ({
         id: c.id,
-        chatId: c.id.replace(/^tg_/, ''),
+        chatId: stripAccount(c.id).id.replace(/^tg_/, ''),
         name: c.name,
         type: c.is_group ? 'group' : 'private',
         lastMessageAt: c.last_message_at,
@@ -2294,7 +2338,11 @@ export class MCPServer {
     });
   }
 
-  private async handleTelegramGetUnread(args?: { limit?: number; only_with_unread?: boolean }) {
+  private async handleTelegramGetUnread(args?: {
+    limit?: number;
+    only_with_unread?: boolean;
+    account?: string;
+  }) {
     // Live unread state — fetched via telegram-sync (Telethon) over its
     // HMAC-authenticated bridge. The Node connector (gramJS) cannot read this
     // against current Telegram MTProto.
@@ -2307,7 +2355,7 @@ export class MCPServer {
     const sig = createHmac('sha256', this.telegramBridgeSecret)
       .update(`${ts}:${body}`)
       .digest('hex');
-    const resp = await fetch(`${this.telegramBridgeUrl}/unread`, {
+    const resp = await fetch(`${this.tgBridgeUrl(args?.account)}/unread`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -2483,9 +2531,27 @@ export class MCPServer {
     return this.jsonResponse(data);
   }
 
-  private async handleMarkAsRead(args: { chatId: string }) {
+  private async handleMarkAsRead(args: { chatId?: string; messageId?: string; account?: string }) {
+    const account = normalizeAccount(args.account);
+    if (account === 'professional') {
+      // WhatsApp Cloud marks a single message read (by wamid), not a whole chat.
+      if (!args.messageId) {
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          'mark_as_read on the professional (WhatsApp Cloud) account requires a messageId (Cloud marks individual messages read, not whole chats).'
+        );
+      }
+      const data = await this.connectorCall(this.waUrl(account), 'POST', '/api/v1/messages/read', {
+        messageId: args.messageId,
+      });
+      return this.jsonResponse(data);
+    }
+    // web (personal): mark the whole chat read by chatId
+    if (!args.chatId) {
+      throw new McpError(ErrorCode.InvalidParams, 'mark_as_read requires a chatId.');
+    }
     const data = await this.connectorCall(
-      this.connectorUrl,
+      this.waUrl(account),
       'POST',
       `/api/v1/messages/read/${args.chatId}`
     );
@@ -2519,19 +2585,20 @@ export class MCPServer {
     return this.jsonResponse(results);
   }
 
-  private async handleTelegramSearch(args: { query: string; chatId?: string; limit?: number }) {
+  private async handleTelegramSearch(args: { query: string; chatId?: string; limit?: number; account?: string }) {
+    const account = normalizeAccount(args.account);
     const limit = Math.min(args.limit ?? 20, 200);
-    const params: any[] = [`%${args.query}%`, limit];
-    let where = `platform = 'telegram' AND content ILIKE $1`;
+    const params: any[] = [`%${args.query}%`, limit, account];
+    let where = `platform = 'telegram' AND account = $3 AND content ILIKE $1`;
     if (args.chatId) {
-      const id = await this.resolveTelegramChatId(args.chatId);
+      const id = await this.resolveTelegramChatId(args.chatId, account);
       if (!id)
         throw new McpError(
           ErrorCode.InvalidParams,
           `Could not resolve Telegram chatId '${args.chatId}'`
         );
       params.push(id);
-      where += ` AND conversation_id = $3`;
+      where += ` AND conversation_id = $4`;
     }
     const result = await this.dbClient.query(
       `SELECT id, conversation_id, sender_wa_id, direction, content, wa_timestamp
@@ -2554,8 +2621,8 @@ export class MCPServer {
     });
   }
 
-  private async handleTelegramChatInfo(args: { chatId: string }) {
-    const id = await this.resolveTelegramChatId(args.chatId);
+  private async handleTelegramChatInfo(args: { chatId: string; account?: string }) {
+    const id = await this.resolveTelegramChatId(args.chatId, normalizeAccount(args.account));
     if (!id)
       throw new McpError(
         ErrorCode.InvalidParams,
@@ -2573,7 +2640,7 @@ export class MCPServer {
     return this.jsonResponse({
       source: 'db',
       id: c.id,
-      chatId: c.id.replace(/^tg_/, ''),
+      chatId: stripAccount(c.id).id.replace(/^tg_/, ''),
       name: c.name,
       type: c.is_group ? 'group' : 'private',
       participantCount: c.participant_count,
@@ -2583,8 +2650,8 @@ export class MCPServer {
     });
   }
 
-  private async handleTelegramParticipants(args: { chatId: string; limit?: number }) {
-    const id = await this.resolveTelegramChatId(args.chatId);
+  private async handleTelegramParticipants(args: { chatId: string; limit?: number; account?: string }) {
+    const id = await this.resolveTelegramChatId(args.chatId, normalizeAccount(args.account));
     if (!id)
       throw new McpError(
         ErrorCode.InvalidParams,

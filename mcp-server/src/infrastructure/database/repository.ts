@@ -6,6 +6,7 @@ import {
   Message,
   Attachment,
 } from '../../domain/entities';
+import { accountKey, normalizeAccount } from '../../domain/account';
 
 export class DatabaseRepository {
   constructor(private client: Pool) {}
@@ -181,7 +182,8 @@ export class DatabaseRepository {
 
   async searchParticipants(
     query: string,
-    limit: number = 20
+    limit: number = 20,
+    account: string = 'personal'
   ): Promise<
     {
       waUserId: string;
@@ -202,9 +204,10 @@ export class DatabaseRepository {
        JOIN conversation_participants cp ON cp.participant_id = p.id
        JOIN conversations c ON cp.conversation_id = c.id
        WHERE (p.name ILIKE $1 OR p.push_name ILIKE $1 OR p.id ILIKE $1 OR p.phone ILIKE $1)
+         AND c.account = $3
        ORDER BY c.last_message_at DESC NULLS LAST
        LIMIT $2`,
-      [searchPattern, limit]
+      [searchPattern, limit, normalizeAccount(account)]
     );
 
     return result.rows.map(row => ({
@@ -222,6 +225,7 @@ export class DatabaseRepository {
     query?: string;
     limit?: number;
     includeParticipants?: boolean;
+    account?: string;
   }): Promise<
     {
       id: string;
@@ -234,6 +238,7 @@ export class DatabaseRepository {
     }[]
   > {
     const { type, query, limit = 20, includeParticipants = true } = options;
+    const account = normalizeAccount(options.account);
     const searchPattern = query ? `%${query}%` : null;
 
     const result = await this.client.query(
@@ -247,9 +252,10 @@ export class DatabaseRepository {
                          JOIN participants p ON p.id = cp.participant_id
                          WHERE cp.conversation_id = c.id
                          AND (p.name ILIKE $2 OR p.push_name ILIKE $2 OR p.id ILIKE $2)))
+         AND c.account = $3
        ORDER BY c.last_message_at DESC NULLS LAST
-       LIMIT $3`,
-      [type || null, searchPattern, limit]
+       LIMIT $4`,
+      [type || null, searchPattern, account, limit]
     );
 
     const conversations = await Promise.all(
@@ -312,7 +318,8 @@ export class DatabaseRepository {
       from?: Date;
       to?: Date;
       limit?: number;
-    }
+    },
+    account: string = 'personal'
   ): Promise<
     {
       id: string;
@@ -328,6 +335,7 @@ export class DatabaseRepository {
     }[]
   > {
     const { conversationId, from, to, limit = 50 } = options;
+    const acc = normalizeAccount(account);
 
     const result = await this.client.query(
       `SELECT m.id, m.conversation_id, c.id as wa_chat_id, c.name as conversation_name,
@@ -342,7 +350,13 @@ export class DatabaseRepository {
          AND ($4::TIMESTAMP IS NULL OR m.wa_timestamp <= $4)
        ORDER BY m.wa_timestamp DESC
        LIMIT $5`,
-      [waUserId, conversationId || null, from || null, to || null, limit]
+      [
+        accountKey(acc, waUserId),
+        conversationId ? accountKey(acc, conversationId) : null,
+        from || null,
+        to || null,
+        limit,
+      ]
     );
 
     return result.rows.map(row => ({
@@ -359,19 +373,20 @@ export class DatabaseRepository {
     }));
   }
 
-  async getUserInfo(waUserId: string): Promise<{
+  async getUserInfo(waUserId: string, account: string = 'personal'): Promise<{
     waUserId: string;
     names: string[];
     conversationCount: number;
     messageCount: number;
     lastSeen: Date | null;
   } | null> {
+    const sid = accountKey(normalizeAccount(account), waUserId);
     const participantResult = await this.client.query(
       `SELECT p.name, p.push_name,
               (SELECT COUNT(DISTINCT cp.conversation_id) FROM conversation_participants cp WHERE cp.participant_id = p.id) as conversation_count
        FROM participants p
        WHERE p.id = $1`,
-      [waUserId]
+      [sid]
     );
 
     if (participantResult.rows.length === 0) {
@@ -382,7 +397,7 @@ export class DatabaseRepository {
       `SELECT COUNT(*) as message_count, MAX(wa_timestamp) as last_seen
        FROM messages
        WHERE sender_wa_id = $1 AND (is_deleted IS NULL OR is_deleted = false)`,
-      [waUserId]
+      [sid]
     );
 
     const row = participantResult.rows[0];

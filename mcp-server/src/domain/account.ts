@@ -16,9 +16,16 @@ export function normalizeAccount(value: unknown): Account {
   return value === 'professional' ? 'professional' : 'personal';
 }
 
-/** Namespace an id by account. Personal stays bare; others are prefixed. */
+/**
+ * Namespace an id by account. Personal stays bare; others are prefixed.
+ * Idempotent: an id that already carries the account prefix is returned
+ * unchanged, so a namespaced id read back from the DB (and handed to a tool
+ * again) is never double-prefixed.
+ */
 export function accountKey(account: Account, id: string): string {
-  return account === 'personal' ? id : `${account}:${id}`;
+  if (account === 'personal') return id;
+  const prefix = `${account}:`;
+  return id.startsWith(prefix) ? id : `${prefix}${id}`;
 }
 
 /** Inverse of accountKey: recover { account, id } from a (possibly namespaced) key. */
