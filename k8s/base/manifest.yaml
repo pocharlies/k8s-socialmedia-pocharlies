@@ -470,6 +470,26 @@ spec:
   tls:
     store: { name: default, namespace: traefik-edge }
 ---
+# LAN-only IngressRoute so in-host workloads (e.g. the synapse-adapter-messaging
+# Hermes worker running on sauvage under user-systemd) can POST
+# /api/v1/messages/send to the WhatsApp connector without going out to
+# Cloudflare. Mirrors the firecrawl-lan / brain-lan pattern.
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: whatsapp-lan
+  namespace: whatsapp-mcp
+spec:
+  entryPoints: [websecure]
+  routes:
+    - match: Host(`whatsapp.lan.e-dani.com`)
+      kind: Rule
+      services:
+        - name: whatsapp-connector
+          port: 3001
+  tls:
+    store: { name: default, namespace: traefik-lan }
+---
 # Telegram-sync (message sync worker)
 apiVersion: apps/v1
 kind: Deployment
