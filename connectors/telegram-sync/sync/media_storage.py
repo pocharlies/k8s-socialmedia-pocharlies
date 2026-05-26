@@ -98,3 +98,25 @@ def upload_media(
         metadata=metadata or None,
     )
     return storage_key, len(data)
+
+
+def upload_avatar(kind: str, ident: str, data: bytes) -> str:
+    """Upload a profile picture to MinIO under avatars/{kind}/{base64url(id)}.jpg.
+
+    kind ∈ {conversations, participants}. The base64url(id) encoding handles
+    WhatsApp `@`-suffixed JIDs and Telegram negative IDs safely.
+    """
+    import base64 as _b64
+    c = _get_client()
+    ensure_bucket()
+    safe = _b64.urlsafe_b64encode(ident.encode()).decode().rstrip("=")
+    storage_key = f"avatars/{kind}/{safe}.jpg"
+    buf = io.BytesIO(data)
+    c.put_object(
+        MINIO_BUCKET,
+        storage_key,
+        buf,
+        length=len(data),
+        content_type="image/jpeg",
+    )
+    return storage_key

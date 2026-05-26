@@ -7,7 +7,7 @@ import asyncpg
 from telethon import TelegramClient, events
 from telethon.tl.types import Message
 
-from sync import db, media_download
+from sync import db, media_download, avatar_sync
 from sync.history import _classify_message, _get_chat_info, _get_sender_name
 
 logger = logging.getLogger(__name__)
@@ -57,6 +57,17 @@ def register(client: TelegramClient, pool: asyncpg.Pool, my_id: int):
                 asyncio.create_task(media_download.download_and_store_media(
                     client, pool, msg, new_message_id, message_type
                 ))
+
+            # Lazy avatar pulls — only fire if we don't yet have an avatar for
+            # the chat OR the sender. Cheap when already populated (a single
+            # SELECT). All errors are swallowed inside avatar_sync.
+            asyncio.create_task(avatar_sync.ensure_conversation_avatar(client, pool, chat))
+            try:
+                sender = await event.get_sender()
+                if sender is not None:
+                    asyncio.create_task(avatar_sync.ensure_participant_avatar(client, pool, sender))
+            except Exception:
+                pass
 
             # Notify auto-reply webhook for inbound text messages
             logger.info(f"Message: dir={direction} type={message_type} text={bool(msg.text)} chat={chat_id}")

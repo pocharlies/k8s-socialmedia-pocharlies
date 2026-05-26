@@ -195,7 +195,18 @@ async def run(client: TelegramClient, pool: asyncpg.Pool):
             dialogs = await client.get_dialogs()
             logger.info(f"Starting sync for {len(dialogs)} chats")
 
+            from sync import avatar_sync
+            avatars_done = 0
             for dialog in dialogs:
+                # Always-on avatar sync — only downloads when avatar_url IS NULL
+                # so existing rows are not re-fetched. Doesn't block the message
+                # import even if it fails (try/except inside avatar_sync).
+                try:
+                    if await avatar_sync.ensure_conversation_avatar(client, pool, dialog.entity):
+                        avatars_done += 1
+                except Exception as e:
+                    logger.warning(f"avatar sync failed for {dialog.name}: {e}")
+
                 try:
                     await import_chat(client, pool, dialog, my_id)
                 except FloodWaitError as e:
@@ -204,6 +215,8 @@ async def run(client: TelegramClient, pool: asyncpg.Pool):
                 except Exception as e:
                     logger.error(f"Error importing chat {dialog.name}: {e}")
                 await asyncio.sleep(DELAY_BETWEEN_CHATS)
+            if avatars_done:
+                logger.info(f"Backfilled {avatars_done} conversation avatars this cycle")
 
             logger.info("Sync cycle complete. Next run in 30 minutes.")
             consecutive_disconnect_failures = 0

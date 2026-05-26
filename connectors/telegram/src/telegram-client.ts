@@ -438,6 +438,35 @@ export class TelegramClientWrapper extends EventEmitter {
   }
 
   /**
+   * Download the profile photo (big size) of a peer (user OR chat).
+   * Returns null if the peer has no photo or it's not accessible (privacy).
+   */
+  async downloadPeerPhoto(peerId: string): Promise<Buffer | null> {
+    if (!this.connected) throw new Error('Not connected');
+    let peer: any;
+    try {
+      peer = await this.client.getPeer(toMtcutePeer(peerId));
+    } catch (e) {
+      return null;
+    }
+    const photo: any = (peer as any).photo;
+    if (!photo) return null;
+    // mtcute exposes a downloadable file id under photo.big (full) or photo.small (thumb).
+    // Different mtcute builds use slightly different shapes — try a few.
+    const candidates: any[] = [photo.big, photo.small, photo, photo.fileId];
+    for (const c of candidates) {
+      if (!c) continue;
+      try {
+        const u8 = await this.client.downloadAsBuffer(c);
+        if (u8 && u8.length > 0) return Buffer.from(u8);
+      } catch (e) {
+        // try next candidate
+      }
+    }
+    return null;
+  }
+
+  /**
    * Send a file to a chat
    */
   async sendFile(

@@ -182,7 +182,27 @@ export class WhatsAppCloudAPI {
 
   async getBusinessProfile(): Promise<unknown> {
     return this.request(
-      `/${this.config.phoneNumberId}/whatsapp_business_profile?fields=about,address,description,vertical,websites`
+      `/${this.config.phoneNumberId}/whatsapp_business_profile?fields=about,address,description,vertical,websites,profile_picture_url`
     );
+  }
+
+  /**
+   * Fetch the business profile picture as raw bytes. Returns null if the
+   * profile has no picture or the URL is not retrievable.
+   */
+  async getBusinessProfilePictureBytes(): Promise<Buffer | null> {
+    try {
+      const profile = (await this.request(
+        `/${this.config.phoneNumberId}/whatsapp_business_profile?fields=profile_picture_url`
+      )) as { data?: Array<{ profile_picture_url?: string }> };
+      const url = profile?.data?.[0]?.profile_picture_url;
+      if (!url) return null;
+      const r = await fetch(url);
+      if (!r.ok) return null;
+      const ab = await r.arrayBuffer();
+      return Buffer.from(ab);
+    } catch {
+      return null;
+    }
   }
 }

@@ -337,6 +337,26 @@ export function createRouter(
     })();
   });
 
+  // Download a chat/contact's profile picture as base64 (mirrors telegram-connector shape).
+  router.get('/chats/:jid/photo', auth, (req: AuthenticatedRequest, res: Response): void => {
+    void (async () => {
+      try {
+        const bytes = await client.getProfilePictureBytes(req.params.jid);
+        if (!bytes) {
+          res.status(404).json({ error: 'No photo' });
+          return;
+        }
+        res.json({
+          data: bytes.toString('base64'),
+          size: bytes.length,
+          contentType: 'image/jpeg',
+        });
+      } catch (e) {
+        res.status(500).json({ error: String(e) });
+      }
+    })();
+  });
+
   // Refresh group metadata and Signal sender-key/session state before a group send.
   router.post(
     '/groups/:id/session/repair',

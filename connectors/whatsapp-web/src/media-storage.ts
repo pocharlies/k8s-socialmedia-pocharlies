@@ -92,3 +92,22 @@ export async function fetchMedia(storageKey: string): Promise<Buffer> {
   for await (const chunk of stream) chunks.push(chunk as Buffer);
   return Buffer.concat(chunks);
 }
+
+/**
+ * Upload a profile picture under avatars/{kind}/{base64url(id)}.jpg.
+ * Returns the storage key so the caller can save it into
+ * conversations.avatar_url / participants.profile_pic_url.
+ */
+export async function uploadAvatar(
+  kind: 'conversations' | 'participants',
+  ident: string,
+  data: Buffer
+): Promise<string> {
+  await ensureMediaBucket();
+  const safe = Buffer.from(ident).toString('base64url');
+  const storageKey = `avatars/${kind}/${safe}.jpg`;
+  await client.putObject(BUCKET, storageKey, data, data.length, {
+    'Content-Type': 'image/jpeg',
+  });
+  return storageKey;
+}
