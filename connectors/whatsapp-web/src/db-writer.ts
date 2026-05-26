@@ -143,10 +143,10 @@ export async function ensureParticipant(data: ParticipantData): Promise<void> {
  */
 export async function setConversationAvatar(id: string, avatarUrl: string): Promise<void> {
   const pool = getPool();
-  await pool.query(
-    `UPDATE conversations SET avatar_url = $2, updated_at = now() WHERE id = $1`,
-    [id, avatarUrl]
-  );
+  await pool.query(`UPDATE conversations SET avatar_url = $2, updated_at = now() WHERE id = $1`, [
+    id,
+    avatarUrl,
+  ]);
 }
 
 export async function setParticipantAvatar(id: string, profilePicUrl: string): Promise<void> {
