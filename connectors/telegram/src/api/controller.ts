@@ -251,6 +251,33 @@ export function createRouter(client: TelegramClientWrapper, sharedSecret: string
   });
 
   /**
+   * GET /peers/:id/photo - Download a peer's profile photo (big size).
+   * Returns {data: base64, size, contentType: 'image/jpeg'} or 404 if no photo.
+   */
+  router.get('/peers/:id/photo', (req: Request, res: Response): void => {
+    void (async () => {
+      try {
+        if (!client.isClientConnected()) {
+          res.status(503).json({ error: 'Not connected to Telegram' });
+          return;
+        }
+        const buffer = await client.downloadPeerPhoto(req.params.id);
+        if (!buffer) {
+          res.status(404).json({ error: 'No photo' });
+          return;
+        }
+        res.json({
+          data: buffer.toString('base64'),
+          size: buffer.length,
+          contentType: 'image/jpeg',
+        });
+      } catch (e) {
+        res.status(500).json({ error: String(e) });
+      }
+    })();
+  });
+
+  /**
    * POST /messages/:chatId - Send a message
    */
   router.post('/messages/:chatId', (req: Request, res: Response): void => {

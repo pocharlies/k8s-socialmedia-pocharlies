@@ -39,6 +39,7 @@ export interface ConversationData {
   name: string;
   isGroup: boolean;
   participantCount: number;
+  avatarUrl?: string;
 }
 
 export interface ParticipantData {
@@ -46,6 +47,7 @@ export interface ParticipantData {
   phone?: string;
   name?: string;
   pushName?: string;
+  profilePicUrl?: string;
 }
 
 export interface MessageKeyData {
@@ -108,28 +110,63 @@ export async function ensureHistoryTables(): Promise<void> {
 export async function ensureConversation(data: ConversationData): Promise<void> {
   const pool = getPool();
   await pool.query(
-    `INSERT INTO conversations (id, name, is_group, participant_count, last_message_at)
-     VALUES ($1, $2, $3, $4, now())
+    `INSERT INTO conversations (id, name, is_group, participant_count, avatar_url, last_message_at)
+     VALUES ($1, $2, $3, $4, $5, now())
      ON CONFLICT (id) DO UPDATE SET
        name = COALESCE(EXCLUDED.name, conversations.name),
        participant_count = EXCLUDED.participant_count,
+       avatar_url = COALESCE(EXCLUDED.avatar_url, conversations.avatar_url),
        last_message_at = now(),
        updated_at = now()`,
-    [data.id, data.name, data.isGroup, data.participantCount]
+    [data.id, data.name, data.isGroup, data.participantCount, data.avatarUrl || null]
   );
 }
 
 export async function ensureParticipant(data: ParticipantData): Promise<void> {
   const pool = getPool();
   await pool.query(
-    `INSERT INTO participants (id, phone, name, push_name, last_seen)
-     VALUES ($1, $2, $3, $4, now())
+    `INSERT INTO participants (id, phone, name, push_name, profile_pic_url, last_seen)
+     VALUES ($1, $2, $3, $4, $5, now())
      ON CONFLICT (id) DO UPDATE SET
        name = COALESCE(EXCLUDED.name, participants.name),
        push_name = COALESCE(EXCLUDED.push_name, participants.push_name),
+       profile_pic_url = COALESCE(EXCLUDED.profile_pic_url, participants.profile_pic_url),
        last_seen = now()`,
-    [data.id, data.phone, data.name, data.pushName]
+    [data.id, data.phone, data.name, data.pushName, data.profilePicUrl || null]
   );
+}
+
+/**
+ * Helper: persist a profile picture URL post-hoc. Use this when the avatar
+ * is fetched async (after ensureConversation/ensureParticipant has already
+ * inserted the row) so we don't block message ingest on the network call.
+ */
+export async function setConversationAvatar(id: string, avatarUrl: string): Promise<void> {
+  const pool = getPool();
+  await pool.query(`UPDATE conversations SET avatar_url = $2, updated_at = now() WHERE id = $1`, [
+    id,
+    avatarUrl,
+  ]);
+}
+
+export async function setParticipantAvatar(id: string, profilePicUrl: string): Promise<void> {
+  const pool = getPool();
+  await pool.query(
+    `UPDATE participants SET profile_pic_url = $2, last_seen = now() WHERE id = $1`,
+    [id, profilePicUrl]
+  );
+}
+
+export async function getConversationAvatar(id: string): Promise<string | null> {
+  const pool = getPool();
+  const r = await pool.query(`SELECT avatar_url FROM conversations WHERE id = $1`, [id]);
+  return r.rows[0]?.avatar_url || null;
+}
+
+export async function getParticipantAvatar(id: string): Promise<string | null> {
+  const pool = getPool();
+  const r = await pool.query(`SELECT profile_pic_url FROM participants WHERE id = $1`, [id]);
+  return r.rows[0]?.profile_pic_url || null;
 }
 
 export async function storeMessage(data: MessageData): Promise<bigint | null> {

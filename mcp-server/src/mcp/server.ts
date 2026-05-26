@@ -19,6 +19,21 @@ import { createHmac } from 'crypto';
 import { t } from '../infrastructure/i18n/i18n';
 import pino from 'pino';
 
+const ACCOUNT_DESCRIPTION =
+  "Account to route this call to. 'personal' (default) = WhatsApp web (Baileys) + Telegram paxanguero. " +
+  "'professional' = WhatsApp Cloud API + Telegram sauvageadminbot (skirmshop). " +
+  'Choose based on the destination chat: skirmshop/business chats → professional; family/personal chats → personal. ' +
+  'When the destination is ambiguous, prefer "professional" for Claude/Codex agents.';
+
+const ACCOUNT_PROPERTY = {
+  account: {
+    type: 'string',
+    enum: ['personal', 'professional'],
+    description: ACCOUNT_DESCRIPTION,
+    default: 'personal',
+  },
+} as const;
+
 export class MCPServer {
   private server: Server;
   private searchService: SearchService;
@@ -165,7 +180,7 @@ export class MCPServer {
         tools: [
           {
             name: 'search_messages',
-            description: 'Search messages by keyword or semantic query',
+            description: 'Search messages by keyword or semantic query, scoped to the selected account.',
             inputSchema: {
               type: 'object',
               properties: {
@@ -175,17 +190,19 @@ export class MCPServer {
                 to: { type: 'string', format: 'date-time', description: 'End date' },
                 sender: { type: 'string', description: 'Filter by sender WhatsApp ID' },
                 limit: { type: 'integer', default: 20, maximum: 100 },
+                ...ACCOUNT_PROPERTY,
               },
               required: ['query'],
             },
           },
           {
             name: 'get_chat',
-            description: 'Get conversation details and recent messages',
+            description: 'Get conversation details and recent messages.',
             inputSchema: {
               type: 'object',
               properties: {
                 chatId: { type: 'string', description: 'Conversation ID' },
+                ...ACCOUNT_PROPERTY,
               },
               required: ['chatId'],
             },
@@ -352,12 +369,14 @@ export class MCPServer {
           },
           {
             name: 'whatsapp_send_message',
-            description: 'Send a WhatsApp message directly (no draft flow)',
+            description:
+              'Send a WhatsApp message directly (no draft flow). Routes by `account`: personal = WhatsApp web (Baileys), professional = WhatsApp Cloud API (skirmshop).',
             inputSchema: {
               type: 'object',
               properties: {
                 chatId: { type: 'string', description: 'Chat/conversation ID' },
                 text: { type: 'string', description: 'Message text to send' },
+                ...ACCOUNT_PROPERTY,
               },
               required: ['chatId', 'text'],
             },
@@ -556,11 +575,18 @@ export class MCPServer {
           },
           {
             name: 'mark_as_read',
-            description: 'Mark a WhatsApp chat as read',
+            description:
+              'Mark a WhatsApp chat as read. Personal account routes to web `/read/:chatId`, professional routes to Cloud API messageId-based ack.',
             inputSchema: {
               type: 'object',
               properties: {
                 chatId: { type: 'string', description: 'Chat ID to mark as read' },
+                messageId: {
+                  type: 'string',
+                  description:
+                    'Optional. For professional (Cloud API) the receipt requires the WA message id.',
+                },
+                ...ACCOUNT_PROPERTY,
               },
               required: ['chatId'],
             },
@@ -573,55 +599,60 @@ export class MCPServer {
           },
           {
             name: 'telegram_search',
-            description: 'Search Telegram messages globally or within a chat',
+            description: 'Search Telegram messages globally or within a chat, scoped to the selected account.',
             inputSchema: {
               type: 'object',
               properties: {
                 query: { type: 'string', description: 'Search query' },
                 chatId: { type: 'string', description: 'Optional: restrict to specific chat' },
                 limit: { type: 'integer', default: 20 },
+                ...ACCOUNT_PROPERTY,
               },
               required: ['query'],
             },
           },
           {
             name: 'telegram_chat_info',
-            description: 'Get Telegram chat/channel details',
+            description: 'Get Telegram chat/channel details.',
             inputSchema: {
               type: 'object',
               properties: {
                 chatId: { type: 'string', description: 'Chat ID or @username' },
+                ...ACCOUNT_PROPERTY,
               },
               required: ['chatId'],
             },
           },
           {
             name: 'telegram_participants',
-            description: 'Get Telegram group/channel members',
+            description: 'Get Telegram group/channel members.',
             inputSchema: {
               type: 'object',
               properties: {
                 chatId: { type: 'string', description: 'Chat ID' },
                 limit: { type: 'integer', default: 100 },
+                ...ACCOUNT_PROPERTY,
               },
               required: ['chatId'],
             },
           },
           {
             name: 'telegram_send_message',
-            description: 'Send a text message in Telegram',
+            description:
+              'Send a text message in Telegram. Routes by `account`: personal = paxanguero session, professional = sauvageadminbot (skirmshop) session.',
             inputSchema: {
               type: 'object',
               properties: {
                 chatId: { type: 'string', description: 'Telegram chat ID' },
                 text: { type: 'string', description: 'Message text' },
+                ...ACCOUNT_PROPERTY,
               },
               required: ['chatId', 'text'],
             },
           },
           {
             name: 'telegram_send_file',
-            description: 'Send a file/photo/video in Telegram',
+            description: 'Send a file/photo/video in Telegram.',
             inputSchema: {
               type: 'object',
               properties: {
@@ -629,67 +660,76 @@ export class MCPServer {
                 filePath: { type: 'string', description: 'URL or path of the file to send' },
                 caption: { type: 'string', description: 'Optional caption' },
                 voiceNote: { type: 'boolean', description: 'Send as voice note', default: false },
+                ...ACCOUNT_PROPERTY,
               },
               required: ['chatId', 'filePath'],
             },
           },
           {
             name: 'telegram_get_messages',
-            description: 'Get messages from a Telegram chat',
+            description: 'Get messages from a Telegram chat.',
             inputSchema: {
               type: 'object',
               properties: {
                 chatId: { type: 'string', description: 'Telegram chat ID' },
                 limit: { type: 'integer', default: 50, maximum: 200 },
                 offsetId: { type: 'integer', description: 'Message ID to start from' },
+                ...ACCOUNT_PROPERTY,
               },
               required: ['chatId'],
             },
           },
           {
             name: 'telegram_forward_message',
-            description: 'Forward a Telegram message to another chat',
+            description: 'Forward a Telegram message to another chat.',
             inputSchema: {
               type: 'object',
               properties: {
                 fromChatId: { type: 'string', description: 'Source chat ID' },
                 messageId: { type: 'string', description: 'Message ID to forward' },
                 toChatId: { type: 'string', description: 'Destination chat ID' },
+                ...ACCOUNT_PROPERTY,
               },
               required: ['fromChatId', 'messageId', 'toChatId'],
             },
           },
           {
             name: 'telegram_delete_message',
-            description: 'Delete a Telegram message',
+            description: 'Delete a Telegram message.',
             inputSchema: {
               type: 'object',
               properties: {
                 chatId: { type: 'string', description: 'Chat ID' },
                 messageId: { type: 'string', description: 'Message ID to delete' },
+                ...ACCOUNT_PROPERTY,
               },
               required: ['chatId', 'messageId'],
             },
           },
           {
             name: 'telegram_mark_as_read',
-            description: 'Mark a Telegram chat as read',
+            description: 'Mark a Telegram chat as read.',
             inputSchema: {
               type: 'object',
               properties: {
                 chatId: { type: 'string', description: 'Chat ID to mark as read' },
+                ...ACCOUNT_PROPERTY,
               },
               required: ['chatId'],
             },
           },
           {
             name: 'telegram_get_dialogs',
-            description: 'List all Telegram chats/dialogs',
-            inputSchema: { type: 'object', properties: {} },
+            description: 'List all Telegram chats/dialogs for the selected account.',
+            inputSchema: {
+              type: 'object',
+              properties: { ...ACCOUNT_PROPERTY },
+            },
           },
           {
             name: 'telegram_get_unread',
-            description: 'Get Telegram chats with unread messages (live state via Telethon bridge)',
+            description:
+              'Get Telegram chats with unread messages (live state via Telethon bridge) for the selected account.',
             inputSchema: {
               type: 'object',
               properties: {
@@ -703,17 +743,19 @@ export class MCPServer {
                   default: true,
                   description: 'If false, also return read dialogs (with unread_count=0)',
                 },
+                ...ACCOUNT_PROPERTY,
               },
             },
           },
           {
             name: 'telegram_download_media',
-            description: 'Download media from a Telegram message',
+            description: 'Download media from a Telegram message.',
             inputSchema: {
               type: 'object',
               properties: {
                 chatId: { type: 'string', description: 'Chat ID' },
                 messageId: { type: 'string', description: 'Message ID containing media' },
+                ...ACCOUNT_PROPERTY,
               },
               required: ['chatId', 'messageId'],
             },

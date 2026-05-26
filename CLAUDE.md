@@ -6,10 +6,27 @@ Servidor MCP multi-plataforma (WhatsApp + Telegram + Instagram) que expone tools
 
 ## Dónde corre
 
-- **Producción actual: x86 `192.168.50.142`** (esta máquina)
-- DGX `192.168.50.140` ya no se usa como producción (no alcanzable desde x86)
-- Repo en GitHub privado: `pocharlies/whatsappmcp`
-- Path local: `/home/dibanez/mcp-socialmedia/` (renombrado desde `/home/dibanez/whatsappmcp`)
+- **Producción actual: k8s namespace `whatsapp-mcp`** (sauvage / ubuntu node)
+- ArgoCD app: `socialmedia` → repo `pocharlies/k8s-socialmedia-pocharlies`, branch `deploy/prod`, path `k8s/overlays/prod`
+- Promoción: workflow_dispatch en `.github/workflows/release.yml` o tag push
+- El stack docker-compose viejo en sauvage `~/mcp-socialmedia/` está parado a propósito desde 2026-05-22 (migración a k8s). NO arrancarlo.
+- Imágenes en Harbor: `harbor.e-dani.com/homelab/whatsappmcp-*`
+
+## Multi-account (personal / professional)
+
+El MCP enruta cada call a una de dos cuentas:
+
+| Account | Telegram | WhatsApp |
+|---|---|---|
+| `personal` (**default**) | `telegram-connector` — sesión `paxanguero` | `whatsapp-connector` — web/Baileys |
+| `professional` | `telegram-connector-professional` — sesión `sauvageadminbot` (skirmshop) | `whatsapp-cloud-connector` — Meta Cloud API |
+
+- Para indicarle al MCP qué cuenta usar pasa `account: 'personal' \| 'professional'` en la tool call.
+- Default global: `personal`. Si el chat es claramente de skirmshop/business → pasar `professional`.
+- Para agentes/sesiones de Claude/Codex/OpenClaw que NO sean específicamente "hogar"/"familia", la guía es: **siempre `account: 'professional'`** salvo que el chat destino sea familiar/personal.
+- Algunos tools son web-only (send_file, forward_message, delete_message, get_me, get_unread_chats, get_group_*, repair_group_session, renew_qr_code, get_connection_status, whatsapp_history_status). Llamarlos con `professional` devuelve InvalidRequest — solo aplican a la cuenta `personal`.
+
+DB scoping (migración 002): los ids de la cuenta `personal` no llevan prefijo (compat con ~449k filas existentes); los de `professional` van prefijados `professional:`. La columna `account` está indexada para filtros rápidos.
 
 ## Estructura
 

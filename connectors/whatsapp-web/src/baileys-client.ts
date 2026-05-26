@@ -49,8 +49,12 @@ import {
   recordHistorySyncProgress,
   getHistorySyncStatus,
   HistorySyncState,
+  getConversationAvatar,
+  getParticipantAvatar,
+  setConversationAvatar,
+  setParticipantAvatar,
 } from './db-writer';
-import { uploadMedia, ensureMediaBucket, fetchMedia } from './media-storage';
+import { uploadMedia, ensureMediaBucket, fetchMedia, uploadAvatar } from './media-storage';
 
 export interface WhatsAppMessage {
   waMessageId: string;
@@ -758,6 +762,11 @@ export class BaileysClient extends EventEmitter {
     });
     await linkParticipantToConversation(waMessage.conversationId, waMessage.senderWaId);
 
+    // Lazy avatar pulls. Don't await — fire-and-forget so a slow profile
+    // picture fetch never delays the message persist.
+    void this.ensureConversationAvatarIfMissing(waMessage.conversationId, rawChatJid);
+    void this.ensureParticipantAvatarIfMissing(waMessage.senderWaId, senderRaw);
+
     const data: MessageData = {
       waMessageId: waMessage.waMessageId,
       conversationId: waMessage.conversationId,
@@ -1216,6 +1225,67 @@ export class BaileysClient extends EventEmitter {
       isAdmin: p.admin === 'admin' || p.admin === 'superadmin',
       isSuperAdmin: p.admin === 'superadmin',
     }));
+  }
+
+  /**
+   * Lazy fetcher: if the conversation has no avatar_url yet, download from
+   * WhatsApp and persist into MinIO + DB. Swallows all errors — never blocks.
+   */
+  private async ensureConversationAvatarIfMissing(
+    conversationId: string,
+    rawJid: string
+  ): Promise<void> {
+    try {
+      const existing = await getConversationAvatar(conversationId);
+      if (existing) return;
+      const bytes = await this.getProfilePictureBytes(rawJid);
+      if (!bytes) return;
+      const key = await uploadAvatar('conversations', conversationId, bytes);
+      await setConversationAvatar(conversationId, key);
+    } catch (e) {
+      // intentionally swallowed — avatar download must not break message ingest
+    }
+  }
+
+  private async ensureParticipantAvatarIfMissing(
+    participantId: string,
+    rawJid: string
+  ): Promise<void> {
+    try {
+      const existing = await getParticipantAvatar(participantId);
+      if (existing) return;
+      const bytes = await this.getProfilePictureBytes(rawJid);
+      if (!bytes) return;
+      const key = await uploadAvatar('participants', participantId, bytes);
+      await setParticipantAvatar(participantId, key);
+    } catch (e) {
+      // swallow
+    }
+  }
+
+  /**
+   * Fetch a contact/group's profile picture as raw JPEG bytes.
+   * Returns null if the JID has no picture or the lookup fails (privacy).
+   */
+  async getProfilePictureBytes(jid: string): Promise<Buffer | null> {
+    if (!this.sock) return null;
+    const raw = this.toRawJid(jid);
+    let url: string | undefined;
+    try {
+      url = await this.sock.profilePictureUrl(raw, 'image');
+    } catch (e) {
+      // 'item-not-found' / 'forbidden' — not all JIDs have pics or are visible
+      return null;
+    }
+    if (!url) return null;
+    try {
+      const r = await fetch(url);
+      if (!r.ok) return null;
+      const ab = await r.arrayBuffer();
+      return Buffer.from(ab);
+    } catch (e) {
+      return null;
+    }
   }
 
   async refreshGroupSession(
