@@ -8,7 +8,7 @@ spec:
     spec:
       containers:
         - name: whatsapp-connector
-          image: harbor.e-dani.com/homelab/whatsappmcp-whatsapp-connector:v1.3.13
+          image: harbor.e-dani.com/homelab/whatsappmcp-whatsapp-connector:v1.3.16@sha256:609d673ee58d45d4a17ca33de53efd7537c9e6d0d2b07ee4d7a0f231787a2d6c
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -20,7 +20,7 @@ spec:
     spec:
       containers:
         - name: whatsapp-cloud-connector
-          image: harbor.e-dani.com/homelab/whatsappmcp-whatsapp-cloud-connector:v1.3.15@sha256:b86e07fa06f10d71c7dcb94a789ae73e98327a7635428f6ddf3409d2defcb2fa
+          image: harbor.e-dani.com/homelab/whatsappmcp-whatsapp-cloud-connector:v1.3.16@sha256:9d8675c915cf52027247efe98e2edbd8b6bbb3a4f008f281456d130414620115
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -44,7 +44,7 @@ spec:
     spec:
       containers:
         - name: telegram-connector
-          image: harbor.e-dani.com/homelab/whatsappmcp-telegram-connector:v1.3.13@sha256:481b56759a60808f4715c7bacf67800e4e584c1f8b402dddd028f6cfbab318a3
+          image: harbor.e-dani.com/homelab/whatsappmcp-telegram-connector:v1.3.16@sha256:b06dce3448da9ec200116d839d1ba1de90367c87838758d65e887d99a6f85073
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -56,7 +56,7 @@ spec:
     spec:
       containers:
         - name: mcp-server
-          image: harbor.e-dani.com/homelab/whatsappmcp-mcp-server:v1.3.15@sha256:46a8f135ade159ac87cc254787d4ff0b13e633b8ca62e488170b1806f0c23065
+          image: harbor.e-dani.com/homelab/whatsappmcp-mcp-server:v1.3.16@sha256:583efc72a22a9415b7381cc3c2b3ec22703f63cca6f46bf517ba8a52bc1646ad
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -68,4 +68,4 @@ spec:
     spec:
       containers:
         - name: telegram-sync
-          image: harbor.e-dani.com/homelab/whatsappmcp-telegram-sync:v1.3.15@sha256:a40eec2c9718d5712e4c8c4a629c2f8851478c163e9e694b212997e21fef389e
+          image: harbor.e-dani.com/homelab/whatsappmcp-telegram-sync:v1.3.16@sha256:e0709e5781943051129c188943f60598209f46e02de50d48d927b6aac62390c0
