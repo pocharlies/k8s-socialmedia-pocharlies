@@ -18,41 +18,36 @@ El MCP enruta cada call a una de dos cuentas:
 
 | Account | Telegram | WhatsApp |
 |---|---|---|
-| `personal` (**default**) | `telegram-connector` — sesión `paxanguero` | `whatsapp-connector` — web/Baileys |
-| `professional` | `telegram-connector-professional` — sesión `sauvageadminbot` (skirmshop) | `whatsapp-cloud-connector` — Meta Cloud API |
+| `personal` (**default**) | `telegram-connector` — sesión `paxanguero` | `whatsapp-connector` — Baileys (número personal) |
+| `professional` | `telegram-connector-professional` — sesión `sauvageadminbot` (skirmshop) | `whatsapp-connector-professional` — Baileys (número de negocio) |
 
+- **Ambas cuentas de WhatsApp son Baileys (WhatsApp Web)** — cada una un Deployment con su número, sesión y PVC propia. NO se usa Cloud API (eliminado: el usuario no quiere pagar a Meta y quiere contestar a mano desde el móvil; Baileys es un dispositivo vinculado).
 - Para indicarle al MCP qué cuenta usar pasa `account: 'personal' \| 'professional'` en la tool call.
 - Default global: `personal`. Si el chat es claramente de skirmshop/business → pasar `professional`.
 - Para agentes/sesiones de Claude/Codex/OpenClaw que NO sean específicamente "hogar"/"familia", la guía es: **siempre `account: 'professional'`** salvo que el chat destino sea familiar/personal.
-- Algunos tools son web-only (send_file, forward_message, delete_message, get_me, get_unread_chats, get_group_*, repair_group_session, renew_qr_code, get_connection_status, whatsapp_history_status). Llamarlos con `professional` devuelve InvalidRequest — solo aplican a la cuenta `personal`.
+- Vincular el número professional: escanear el QR en `https://whatsapp-pro.lan.e-dani.com/qr/page` (LAN).
 
 DB scoping (migración 002): los ids de la cuenta `personal` no llevan prefijo (compat con ~449k filas existentes); los de `professional` van prefijados `professional:`. La columna `account` está indexada para filtros rápidos.
 
 ## Estructura
 
 Tras el refactor del 2026-05-07 (commit `6791fae`), todo bajo carpetas dedicadas:
-- `connectors/{whatsapp-web,whatsapp-cloud,telegram,telegram-sync,instagram}/`
+- `connectors/{whatsapp-web,telegram,telegram-sync,instagram}/` — `whatsapp-web` (Baileys) sirve ambas cuentas de WhatsApp vía dos Deployments
 - `mcp-server/`, `shared/`
 
 ## Conectores (estado 2026-05-08)
 
 | Conector | Puerto | Estado | Notas |
 |----------|--------|--------|-------|
-| WhatsApp Web personal | 3001 | ✅ connected | sesión persistente en `connectors/whatsapp-web/session-data/` |
-| Telegram | 3002 | ✅ connected | gramjs (send + realtime) |
-| Telegram-sync | 3080 | ✅ healthy | telethon, ingestion → Postgres |
+| WhatsApp Web personal | 3001 | ✅ | Baileys, número personal; sesión en PVC `whatsapp-session-data` |
+| WhatsApp Web professional | 3001 | ✅ | Baileys, número de negocio; deploy `whatsapp-connector-professional`, PVC `whatsapp-session-data-professional` |
+| Telegram | 3002 | ✅ | gramjs (send + realtime); personal + professional |
+| Telegram-sync | 3080 | ✅ | telethon, ingestion → Postgres |
 | Instagram | 3003 | ✅ 2 cuentas | skirmshop (~7.135), barbelpapis (~14.949) |
-| WhatsApp Cloud API | 3004 | ⛔ diferido | container up, `connected:false` (ver abajo) |
-| MCP server (interno) | 3000 | ✅ healthy | |
-| MCP SSE (público) | 3010 | ✅ healthy | Bearer token en `docker-compose.yml` L205 |
+| MCP server (interno) | 3000 | ✅ | |
+| MCP SSE (público) | 3010 | ✅ | Bearer token |
 
-## WhatsApp Cloud API — DIFERIDO
-
-**No tocar hasta que tengamos el teléfono dedicado.**
-
-Estado: container arranca pero `connected:false` porque no hay sesión/teléfono configurado. El `WHATSAPP_PHONE_NUMBER_ID=1005582045977097` en `.env` está, pero falta el dispositivo físico.
-
-Retomar cuando se adquiera el teléfono dedicado para la Business API.
+> **WhatsApp Cloud API eliminado (2026-05-27).** Se sustituyó por una segunda cuenta Baileys. Motivo: coste cero (no Meta) y poder contestar a mano desde el móvil.
 
 ## Instagram — DMs bloqueados, resto OK
 

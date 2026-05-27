@@ -193,6 +193,16 @@ spec:
   accessModes: [ReadWriteOnce]
   resources: { requests: { storage: 1Gi } }
   storageClassName: longhorn
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: whatsapp-session-data-professional
+  namespace: whatsapp-mcp
+spec:
+  accessModes: [ReadWriteOnce]
+  resources: { requests: { storage: 1Gi } }
+  storageClassName: longhorn
 
 # ── Connectors (stateless) ────────────────────────────────────────────────────
 ---
@@ -251,38 +261,65 @@ spec:
   selector: { app: whatsapp-connector }
   ports: [{ name: http, port: 3001, targetPort: 3001 }]
 ---
+# ── WhatsApp professional: a SECOND Baileys (WhatsApp Web) connector ──────────
+# Same image as the personal connector; CONNECTOR_ACCOUNT=professional tags its
+# events so ingestion namespaces ids. Own session PVC (RWO, can't be shared).
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: whatsapp-cloud-connector
+  name: whatsapp-connector-professional
   namespace: whatsapp-mcp
 spec:
   replicas: 1
-  selector: { matchLabels: { app: whatsapp-cloud-connector } }
+  strategy: { type: Recreate }
+  selector: { matchLabels: { app: whatsapp-connector-professional } }
   template:
-    metadata: { labels: { app: whatsapp-cloud-connector } }
+    metadata: { labels: { app: whatsapp-connector-professional } }
     spec:
       enableServiceLinks: false
       nodeSelector: { topology: lan, kubernetes.io/arch: amd64 }
       containers:
-        - name: whatsapp-cloud-connector
-          image: harbor.e-dani.com/homelab/whatsappmcp-whatsapp-cloud-connector:latest
-          ports: [{ name: http, containerPort: 3004 }]
+        - name: whatsapp-connector-professional
+          image: harbor.e-dani.com/homelab/whatsappmcp-whatsapp-connector:1357057afaf6@sha256:6a0789feb3fe2b268659508bbab259cfdf4a997513f83bc58fa181245aa67aae
+          ports: [{ name: http, containerPort: 3001 }]
           env:
+            - { name: REDIS_URL, value: "redis://whatsapp-mcp-redis.whatsapp-mcp.svc.cluster.local:6379" }
             - { name: NATS_URL, value: "nats://whatsapp-mcp-nats.whatsapp-mcp.svc.cluster.local:4222" }
+            - { name: DATABASE_URL, value: "postgresql://$(DB_USER):$(DB_PASSWORD)@postgres-shared-rw.databases.svc.cluster.local:5432/whatsappmcp" }
+            - { name: ENABLE_SENDING, value: "true" }
+            - { name: SESSION_PATH, value: "/app/persistent-session" }
             # professional account → published events carry account=professional
             - { name: CONNECTOR_ACCOUNT, value: "professional" }
+            - { name: WA_QR_PUBLIC_URL, value: "https://whatsapp-pro.lan.e-dani.com/qr/page" }
+            - { name: MINIO_ENDPOINT, value: "whatsapp-mcp-minio.whatsapp-mcp.svc.cluster.local:9000" }
+            - { name: MINIO_ACCESS_KEY, value: "$(MINIO_ROOT_USER)" }
+            - { name: MINIO_SECRET_KEY, value: "$(MINIO_ROOT_PASSWORD)" }
+            - { name: MINIO_USE_SSL, value: "false" }
+            - { name: MINIO_BUCKET, value: "socialmedia-media" }
+            - { name: EMBEDDING_BASE_URL, value: "http://bge-m3-embedding.llm.svc.cluster.local:8000/v1" }
+            - { name: EMBEDDING_MODEL, value: "bge-m3" }
+            - { name: EMBEDDING_DIMENSION, value: "1024" }
           envFrom: [{ secretRef: { name: whatsapp-mcp-secrets } }]
           resources:
-            requests: { cpu: 30m, memory: 64Mi }
-            limits:   { memory: 256Mi }
+            requests: { cpu: 50m, memory: 128Mi }
+            limits:   { memory: 512Mi }
+          readinessProbe:
+            httpGet: { path: /api/v1/health, port: 3001 }
+            initialDelaySeconds: 15
+            timeoutSeconds: 3
+          volumeMounts:
+            - name: whatsapp-session-data-professional
+              mountPath: /app/persistent-session
+      volumes:
+        - name: whatsapp-session-data-professional
+          persistentVolumeClaim: { claimName: whatsapp-session-data-professional }
 ---
 apiVersion: v1
 kind: Service
-metadata: { name: whatsapp-cloud-connector, namespace: whatsapp-mcp }
+metadata: { name: whatsapp-connector-professional, namespace: whatsapp-mcp }
 spec:
-  selector: { app: whatsapp-cloud-connector }
-  ports: [{ name: http, port: 3004, targetPort: 3004 }]
+  selector: { app: whatsapp-connector-professional }
+  ports: [{ name: http, port: 3001, targetPort: 3001 }]
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -486,6 +523,24 @@ spec:
       kind: Rule
       services:
         - name: whatsapp-connector
+          port: 3001
+  tls:
+    store: { name: default, namespace: traefik-lan }
+---
+# LAN-only IngressRoute for the professional (business) Baileys connector — used
+# to scan the QR (/qr/page) to link the business number, and for in-host send.
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: whatsapp-pro-lan
+  namespace: whatsapp-mcp
+spec:
+  entryPoints: [websecure]
+  routes:
+    - match: Host(`whatsapp-pro.lan.e-dani.com`)
+      kind: Rule
+      services:
+        - name: whatsapp-connector-professional
           port: 3001
   tls:
     store: { name: default, namespace: traefik-lan }

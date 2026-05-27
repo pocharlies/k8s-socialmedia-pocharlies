@@ -60,14 +60,6 @@ node_service(
 )
 
 node_service(
-    name="whatsapp-cloud-connector",
-    image_suffix="whatsapp-cloud-connector",
-    dockerfile="connectors/whatsapp-cloud/Dockerfile",
-    watch_dirs=["connectors/whatsapp-cloud"],
-    port="3004:3004",
-)
-
-node_service(
     name="telegram-connector",
     image_suffix="telegram-connector",
     dockerfile="connectors/telegram/Dockerfile",
@@ -118,7 +110,6 @@ k8s_resource("whatsapp-mcp-minio",    labels=["infra"])
 
 # ── Labels for Tilt UI grouping ───────────────────────────────────────────────
 k8s_resource("whatsapp-connector",       labels=["connectors"])
-k8s_resource("whatsapp-cloud-connector", labels=["connectors"])
 k8s_resource("telegram-connector",       labels=["connectors"])
 k8s_resource("telegram-sync",            labels=["connectors"])
 k8s_resource("instagram-connector",      labels=["connectors"])

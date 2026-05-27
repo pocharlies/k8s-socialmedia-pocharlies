@@ -295,29 +295,6 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  whatsapp-cloud-connector:
-    build:
-      context: .
-      dockerfile: ./connectors/whatsapp-cloud/Dockerfile
-    environment:
-      WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN}
-      WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID}
-      WHATSAPP_BUSINESS_ACCOUNT_ID: ${WHATSAPP_BUSINESS_ACCOUNT_ID}
-      FACEBOOK_APP_SECRET: ${FACEBOOK_APP_SECRET}
-      WHATSAPP_WEBHOOK_VERIFY_TOKEN: ${WHATSAPP_WEBHOOK_VERIFY_TOKEN}
-      CONNECTOR_SHARED_SECRET: ${CONNECTOR_SHARED_SECRET:-dev-secret-change-in-production}
-      NATS_URL: tls://nats:4222
-      NATS_CA_CERT: /certs/ca.crt
-      PORT: 3004
-      NODE_EXTRA_CA_CERTS: /certs/ca.crt
-    volumes:
-      - ./certs/ca.crt:/certs/ca.crt:ro
-    ports:
-      - "3004:3004"
-    depends_on:
-      nats:
-        condition: service_healthy
-    restart: unless-stopped
 
 volumes:
   postgres_data:

@@ -16,6 +16,9 @@ export class EventPublisher {
   private logger: pino.Logger;
   private caCertPath?: string;
   private connected = false;
+  // Which WhatsApp account this connector instance serves. Personal leaves ids
+  // bare; professional namespaces them downstream (see mcp-server accountKey).
+  private account = process.env.CONNECTOR_ACCOUNT || 'personal';
 
   constructor(
     private natsUrl: string,
@@ -53,7 +56,10 @@ export class EventPublisher {
       return;
     }
     try {
-      this.nc.publish(`whatsapp.${EventType.MESSAGE_RECEIVED}`, jsonCodec.encode(event));
+      // Tag the event with this connector's account so the ingestion service
+      // namespaces ids correctly (personal stays bare, professional prefixed).
+      const tagged = { ...event, account: event.account ?? this.account };
+      this.nc.publish(`whatsapp.${EventType.MESSAGE_RECEIVED}`, jsonCodec.encode(tagged));
     } catch (error) {
       this.logger.error(`Failed to publish: ${String(error)}`);
     }
