@@ -456,6 +456,11 @@ export class BaileysClient extends EventEmitter {
         this.meJid = sock.user?.id ? jidNormalizedUser(sock.user.id) : null;
         this.meName = sock.user?.name || null;
         this.markConnected('connection.update open');
+        // Pull current unread/archived/pin state from WhatsApp app-state. This
+        // emits chats.update events whose handler persists unread_count +
+        // archived to the DB, so the dashboard shows the real badges without
+        // waiting for new traffic. Fire-and-forget; safe if it fails.
+        void this.resyncChatState('connection-open');
         return;
       }
 
@@ -1437,6 +1442,26 @@ export class BaileysClient extends EventEmitter {
         isGroup: c.isGroup,
         timestamp: c.timestamp,
       }));
+  }
+
+  /**
+   * Force an app-state resync to pull current unread/archived/pin state from
+   * WhatsApp. baileys emits chats.update events for each mutation, which the
+   * chats.update handler persists to the DB. Returns once the sync completes.
+   */
+  async resyncChatState(reason = 'manual'): Promise<{ ok: boolean; error?: string }> {
+    if (!this.sock) return { ok: false, error: 'not connected' };
+    try {
+      this.logger.info(`resyncAppState (${reason})`);
+      await (this.sock as any).resyncAppState(
+        ['critical_unblock_low', 'regular_high', 'regular_low', 'regular'],
+        false
+      );
+      return { ok: true };
+    } catch (e: any) {
+      this.logger.warn(`resyncAppState failed: ${e?.message || e}`);
+      return { ok: false, error: String(e?.message || e) };
+    }
   }
 
   private async fetchGroupMetadata(rawJid: string, force = false): Promise<GroupMetadata> {

@@ -155,14 +155,21 @@ export function createRouter(
   router.post('/messages/audio', auth, (req: AuthenticatedRequest, res: Response): void => {
     void (async (): Promise<void> => {
       try {
-        const body = req.body as { conversationId?: string; audioBase64?: string; mimeType?: string };
+        const body = req.body as {
+          conversationId?: string;
+          audioBase64?: string;
+          mimeType?: string;
+        };
         const { conversationId, audioBase64, mimeType } = body;
 
         if (!conversationId || !audioBase64) {
           res.status(400).json({ error: 'Missing conversationId or audioBase64' });
           return;
         }
-        if (process.env.ENABLE_SENDING !== 'true' || process.env.EMERGENCY_DISABLE_SENDING === 'true') {
+        if (
+          process.env.ENABLE_SENDING !== 'true' ||
+          process.env.EMERGENCY_DISABLE_SENDING === 'true'
+        ) {
           res.status(statusForSendFailure('disabled_sending')).json({
             error: 'Sending is disabled',
             failureClass: 'disabled_sending',
@@ -178,8 +185,14 @@ export function createRouter(
         }
 
         const buf = Buffer.from(audioBase64, 'base64');
-        const messageId = await client.sendVoice(conversationId, buf, mimeType || 'audio/ogg; codecs=opus');
-        console.info(`WhatsApp voice sent conversationId=${conversationId} messageId=${messageId || ''}`);
+        const messageId = await client.sendVoice(
+          conversationId,
+          buf,
+          mimeType || 'audio/ogg; codecs=opus'
+        );
+        console.info(
+          `WhatsApp voice sent conversationId=${conversationId} messageId=${messageId || ''}`
+        );
         res.json({ messageId, sentAt: new Date().toISOString() });
       } catch (error) {
         const failureClass = classifyWhatsAppSendFailure(error);
@@ -307,6 +320,18 @@ export function createRouter(
       try {
         const chats = await client.getUnreadChats();
         res.json({ chats });
+      } catch (e) {
+        res.status(500).json({ error: String(e) });
+      }
+    })();
+  });
+
+  // Force app-state resync → persists current unread/archived to the DB.
+  router.post('/chats/resync-state', auth, (req: AuthenticatedRequest, res: Response): void => {
+    void (async () => {
+      try {
+        const result = await client.resyncChatState('api');
+        res.json(result);
       } catch (e) {
         res.status(500).json({ error: String(e) });
       }
