@@ -449,6 +449,25 @@ export class TelegramClientWrapper extends EventEmitter {
   }
 
   /**
+   * Add or clear an emoji reaction on a message. Empty/undefined emoji
+   * removes any existing reaction. Returns true if Telegram accepted the call.
+   */
+  async reactToMessage(chatId: string, messageId: number, emoji?: string | null): Promise<boolean> {
+    if (!this.connected) throw new Error('Not connected');
+    try {
+      await (this.client as any).sendReaction({
+        chatId: toMtcutePeer(chatId),
+        message: messageId,
+        emoji: emoji ? emoji : null,
+      });
+      return true;
+    } catch (e) {
+      this.logger.warn(`reactToMessage failed for ${chatId}/${messageId}: ${(e as Error).message}`);
+      return false;
+    }
+  }
+
+  /**
    * Download media from a message
    */
   async downloadMedia(chatId: string, messageId: number): Promise<Buffer | null> {

@@ -181,6 +181,30 @@ export function createRouter(client: TelegramClientWrapper, sharedSecret: string
   });
 
   /**
+   * POST /messages/react - Add or clear an emoji reaction on a message
+   */
+  router.post('/messages/react', (req: Request, res: Response): void => {
+    void (async () => {
+      try {
+        const { chatId, messageId, emoji } = req.body as {
+          chatId?: string;
+          messageId?: number | string;
+          emoji?: string;
+        };
+        if (!chatId || messageId === undefined || messageId === null) {
+          res.status(400).json({ error: 'Missing chatId or messageId' });
+          return;
+        }
+        const msgId = typeof messageId === 'string' ? parseInt(messageId, 10) : messageId;
+        const ok = await client.reactToMessage(chatId, msgId, emoji || null);
+        res.json({ reacted: ok, emoji: emoji || null });
+      } catch (e) {
+        res.status(500).json({ error: String(e) });
+      }
+    })();
+  });
+
+  /**
    * POST /messages/forward - Forward a message
    */
   router.post('/messages/forward', (req: Request, res: Response): void => {
