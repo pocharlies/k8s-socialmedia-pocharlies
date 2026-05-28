@@ -669,7 +669,7 @@ metadata:
   name: telegram-sync-professional
   namespace: whatsapp-mcp
 spec:
-  replicas: 0  # paused: see telegram-connector-professional
+  replicas: 1  # active: sauvageadminbot (skirmshop) ingest via telethon
   selector: { matchLabels: { app: telegram-sync-professional } }
   template:
     metadata: { labels: { app: telegram-sync-professional } }

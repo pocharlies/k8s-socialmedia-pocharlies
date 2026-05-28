@@ -153,7 +153,8 @@ export class MCPServer {
         tools: [
           {
             name: 'search_messages',
-            description: 'Search messages by keyword or semantic query, scoped to the selected account.',
+            description:
+              'Search messages by keyword or semantic query, scoped to the selected account.',
             inputSchema: {
               type: 'object',
               properties: {
@@ -356,7 +357,7 @@ export class MCPServer {
           },
           {
             name: 'renew_qr_code',
-            description: 'Disconnect WhatsApp and generate a new QR code for re-authentication',
+            description: 'Disconnect WhatsApp and generate a new QR code for re-authentication.',
             inputSchema: {
               type: 'object',
               properties: {
@@ -364,21 +365,22 @@ export class MCPServer {
                   type: 'boolean',
                   description: 'Must be true to confirm disconnection',
                 },
+                ...ACCOUNT_PROPERTY,
               },
               required: ['confirmDisconnect'],
             },
           },
           {
             name: 'get_connection_status',
-            description: 'Get WhatsApp connection status and QR code availability',
+            description: 'Get WhatsApp connection status and QR code availability.',
             inputSchema: {
               type: 'object',
-              properties: {},
+              properties: { ...ACCOUNT_PROPERTY },
             },
           },
           {
             name: 'search_users',
-            description: 'Buscar usuarios de WhatsApp por nombre o teléfono',
+            description: 'Buscar usuarios de WhatsApp por nombre o teléfono.',
             inputSchema: {
               type: 'object',
               properties: {
@@ -389,13 +391,14 @@ export class MCPServer {
                   maximum: 100,
                   description: 'Número máximo de resultados',
                 },
+                ...ACCOUNT_PROPERTY,
               },
               required: ['query'],
             },
           },
           {
             name: 'list_conversations',
-            description: 'Listar conversaciones con filtros opcionales',
+            description: 'Listar conversaciones con filtros opcionales.',
             inputSchema: {
               type: 'object',
               properties: {
@@ -419,12 +422,13 @@ export class MCPServer {
                   default: true,
                   description: 'Incluir lista de participantes',
                 },
+                ...ACCOUNT_PROPERTY,
               },
             },
           },
           {
             name: 'get_user_messages',
-            description: 'Obtener mensajes de un usuario específico',
+            description: 'Obtener mensajes de un usuario específico.',
             inputSchema: {
               type: 'object',
               properties: {
@@ -448,88 +452,95 @@ export class MCPServer {
                   maximum: 200,
                   description: 'Número máximo de mensajes',
                 },
+                ...ACCOUNT_PROPERTY,
               },
               required: ['waUserId'],
             },
           },
           {
             name: 'download_media',
-            description: 'Download media (photo/video/doc) from a WhatsApp message',
+            description: 'Download media (photo/video/doc) from a WhatsApp message.',
             inputSchema: {
               type: 'object',
               properties: {
                 chatId: { type: 'string', description: 'Chat/conversation ID' },
                 messageId: { type: 'string', description: 'Message ID containing media' },
+                ...ACCOUNT_PROPERTY,
               },
               required: ['chatId', 'messageId'],
             },
           },
           {
             name: 'send_file',
-            description: 'Send a file/image/video via WhatsApp from a URL',
+            description: 'Send a file/image/video via WhatsApp from a URL.',
             inputSchema: {
               type: 'object',
               properties: {
                 conversationId: { type: 'string', description: 'Chat/conversation ID' },
                 fileUrl: { type: 'string', description: 'URL of file to send' },
                 caption: { type: 'string', description: 'Optional caption' },
+                ...ACCOUNT_PROPERTY,
               },
               required: ['conversationId', 'fileUrl'],
             },
           },
           {
             name: 'forward_message',
-            description: 'Forward a WhatsApp message to another chat',
+            description: 'Forward a WhatsApp message to another chat.',
             inputSchema: {
               type: 'object',
               properties: {
                 chatId: { type: 'string', description: 'Source chat ID' },
                 messageId: { type: 'string', description: 'Message to forward' },
                 toChatId: { type: 'string', description: 'Destination chat ID' },
+                ...ACCOUNT_PROPERTY,
               },
               required: ['chatId', 'messageId', 'toChatId'],
             },
           },
           {
             name: 'delete_message',
-            description: 'Delete a WhatsApp message (own messages only)',
+            description: 'Delete a WhatsApp message (own messages only).',
             inputSchema: {
               type: 'object',
               properties: {
                 chatId: { type: 'string', description: 'Chat ID' },
                 messageId: { type: 'string', description: 'Message ID to delete' },
+                ...ACCOUNT_PROPERTY,
               },
               required: ['chatId', 'messageId'],
             },
           },
           {
             name: 'get_me',
-            description: 'Get authenticated WhatsApp account info',
-            inputSchema: { type: 'object', properties: {} },
+            description: 'Get authenticated WhatsApp account info.',
+            inputSchema: { type: 'object', properties: { ...ACCOUNT_PROPERTY } },
           },
           {
             name: 'get_unread_chats',
-            description: 'Get WhatsApp chats with unread messages',
-            inputSchema: { type: 'object', properties: {} },
+            description: 'Get WhatsApp chats with unread messages.',
+            inputSchema: { type: 'object', properties: { ...ACCOUNT_PROPERTY } },
           },
           {
             name: 'get_group_info',
-            description: 'Get WhatsApp group details (name, description, participant count)',
+            description: 'Get WhatsApp group details (name, description, participant count).',
             inputSchema: {
               type: 'object',
               properties: {
                 groupId: { type: 'string', description: 'Group chat ID' },
+                ...ACCOUNT_PROPERTY,
               },
               required: ['groupId'],
             },
           },
           {
             name: 'get_group_participants',
-            description: 'Get WhatsApp group member list with admin status',
+            description: 'Get WhatsApp group member list with admin status.',
             inputSchema: {
               type: 'object',
               properties: {
                 groupId: { type: 'string', description: 'Group chat ID' },
+                ...ACCOUNT_PROPERTY,
               },
               required: ['groupId'],
             },
@@ -537,11 +548,12 @@ export class MCPServer {
           {
             name: 'whatsapp_repair_group_session',
             description:
-              'Refresh WhatsApp group metadata and Signal session state before sending to a group',
+              'Refresh WhatsApp group metadata and Signal session state before sending to a group.',
             inputSchema: {
               type: 'object',
               properties: {
                 groupId: { type: 'string', description: 'Group chat ID ending in @g.us' },
+                ...ACCOUNT_PROPERTY,
               },
               required: ['groupId'],
             },
@@ -567,7 +579,8 @@ export class MCPServer {
           },
           {
             name: 'telegram_search',
-            description: 'Search Telegram messages globally or within a chat, scoped to the selected account.',
+            description:
+              'Search Telegram messages globally or within a chat, scoped to the selected account.',
             inputSchema: {
               type: 'object',
               properties: {
@@ -730,13 +743,13 @@ export class MCPServer {
           },
           {
             name: 'telegram_get_status',
-            description: 'Get Telegram connection status',
-            inputSchema: { type: 'object', properties: {} },
+            description: 'Get Telegram connection status for the selected account.',
+            inputSchema: { type: 'object', properties: { ...ACCOUNT_PROPERTY } },
           },
           {
             name: 'telegram_get_me',
-            description: 'Get authenticated Telegram account info',
-            inputSchema: { type: 'object', properties: {} },
+            description: 'Get authenticated Telegram account info for the selected account.',
+            inputSchema: { type: 'object', properties: { ...ACCOUNT_PROPERTY } },
           },
           {
             name: 'instagram_get_profile',
@@ -1096,7 +1109,7 @@ export class MCPServer {
           case 'renew_qr_code':
             return await this.handleRenewQRCode(args as any);
           case 'get_connection_status':
-            return await this.handleGetConnectionStatus();
+            return await this.handleGetConnectionStatus(args as any);
           case 'search_users':
             return await this.handleSearchUsers(args as any);
           case 'list_conversations':
@@ -1112,9 +1125,9 @@ export class MCPServer {
           case 'delete_message':
             return await this.handleDeleteMessage(args as any);
           case 'get_me':
-            return await this.handleGetMe();
+            return await this.handleGetMe(args as any);
           case 'get_unread_chats':
-            return await this.handleGetUnreadChats();
+            return await this.handleGetUnreadChats(args as any);
           case 'get_group_info':
             return await this.handleGetGroupInfo(args as any);
           case 'get_group_participants':
@@ -1150,9 +1163,9 @@ export class MCPServer {
           case 'telegram_download_media':
             return await this.handleTelegramDownloadMedia(args as any);
           case 'telegram_get_status':
-            return await this.handleTelegramGetStatus();
+            return await this.handleTelegramGetStatus(args as any);
           case 'telegram_get_me':
-            return await this.handleTelegramGetMe();
+            return await this.handleTelegramGetMe(args as any);
           case 'instagram_get_profile':
             return await this.handleInstagramGetProfile(args as any);
           case 'instagram_get_media':
@@ -1923,7 +1936,7 @@ export class MCPServer {
     }
   }
 
-  private async handleRenewQRCode(args: { confirmDisconnect?: boolean }) {
+  private async handleRenewQRCode(args: { confirmDisconnect?: boolean; account?: string }) {
     if (!args.confirmDisconnect) {
       throw new McpError(
         ErrorCode.InvalidRequest,
@@ -1931,7 +1944,7 @@ export class MCPServer {
       );
     }
 
-    const connectorUrl = process.env.CONNECTOR_URL || 'http://whatsapp-connector:3001';
+    const connectorUrl = this.waUrl(args.account);
     const sharedSecret = process.env.CONNECTOR_SHARED_SECRET || '';
 
     try {
@@ -1978,8 +1991,8 @@ export class MCPServer {
     }
   }
 
-  private async handleGetConnectionStatus() {
-    const connectorUrl = process.env.CONNECTOR_URL || 'http://whatsapp-connector:3001';
+  private async handleGetConnectionStatus(args?: { account?: string }) {
+    const connectorUrl = this.waUrl(args?.account);
 
     try {
       const response = await fetch(`${connectorUrl}/api/v1/health`);
@@ -2190,7 +2203,11 @@ export class MCPServer {
     };
   }
 
-  private async handleTelegramSendMessage(args: { chatId: string; text: string; account?: string }) {
+  private async handleTelegramSendMessage(args: {
+    chatId: string;
+    text: string;
+    account?: string;
+  }) {
     const data = await this.connectorCall(
       this.tgUrl(args.account),
       'POST',
@@ -2207,12 +2224,17 @@ export class MCPServer {
     voiceNote?: boolean;
     account?: string;
   }) {
-    const data = await this.connectorCall(this.tgUrl(args.account), 'POST', '/api/v1/messages/media/send', {
-      chatId: args.chatId,
-      filePath: args.filePath,
-      caption: args.caption,
-      voiceNote: args.voiceNote || false,
-    });
+    const data = await this.connectorCall(
+      this.tgUrl(args.account),
+      'POST',
+      '/api/v1/messages/media/send',
+      {
+        chatId: args.chatId,
+        filePath: args.filePath,
+        caption: args.caption,
+        voiceNote: args.voiceNote || false,
+      }
+    );
     return this.jsonResponse(data);
   }
 
@@ -2293,15 +2315,24 @@ export class MCPServer {
     toChatId: string;
     account?: string;
   }) {
-    const data = await this.connectorCall(this.tgUrl(args.account), 'POST', '/api/v1/messages/forward', {
-      fromChatId: args.fromChatId,
-      messageId: args.messageId,
-      toChatId: args.toChatId,
-    });
+    const data = await this.connectorCall(
+      this.tgUrl(args.account),
+      'POST',
+      '/api/v1/messages/forward',
+      {
+        fromChatId: args.fromChatId,
+        messageId: args.messageId,
+        toChatId: args.toChatId,
+      }
+    );
     return this.jsonResponse(data);
   }
 
-  private async handleTelegramDeleteMessage(args: { chatId: string; messageId: string; account?: string }) {
+  private async handleTelegramDeleteMessage(args: {
+    chatId: string;
+    messageId: string;
+    account?: string;
+  }) {
     const data = await this.connectorCall(
       this.tgUrl(args.account),
       'DELETE',
@@ -2378,7 +2409,11 @@ export class MCPServer {
     return this.jsonResponse(await resp.json());
   }
 
-  private async handleTelegramDownloadMedia(args: { chatId: string; messageId: string; account?: string }) {
+  private async handleTelegramDownloadMedia(args: {
+    chatId: string;
+    messageId: string;
+    account?: string;
+  }) {
     const data = await this.connectorCall(
       this.tgUrl(args.account),
       'GET',
@@ -2387,13 +2422,13 @@ export class MCPServer {
     return this.jsonResponse(data);
   }
 
-  private async handleTelegramGetStatus() {
-    const data = await this.connectorCall(this.telegramUrl, 'GET', '/api/v1/status');
+  private async handleTelegramGetStatus(args?: { account?: string }) {
+    const data = await this.connectorCall(this.tgUrl(args?.account), 'GET', '/api/v1/status');
     return this.jsonResponse(data);
   }
 
-  private async handleTelegramGetMe() {
-    const data = await this.connectorCall(this.telegramUrl, 'GET', '/api/v1/me');
+  private async handleTelegramGetMe(args?: { account?: string }) {
+    const data = await this.connectorCall(this.tgUrl(args?.account), 'GET', '/api/v1/me');
     return this.jsonResponse(data);
   }
 
@@ -2429,9 +2464,9 @@ export class MCPServer {
     return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
   }
 
-  private async handleDownloadMedia(args: { chatId: string; messageId: string }) {
+  private async handleDownloadMedia(args: { chatId: string; messageId: string; account?: string }) {
     const data = await this.connectorCall(
-      this.connectorUrl,
+      this.waUrl(args.account),
       'GET',
       `/api/v1/messages/media/${args.chatId}/${args.messageId}`
     );
@@ -2442,15 +2477,17 @@ export class MCPServer {
     conversationId: string;
     fileUrl: string;
     caption?: string;
+    account?: string;
   }) {
     if (process.env.ENABLE_SENDING !== 'true') {
       throw new McpError(ErrorCode.InvalidRequest, 'Sending disabled');
     }
+    const { account, ...body } = args;
     const data = await this.connectorCall(
-      this.connectorUrl,
+      this.waUrl(account),
       'POST',
       '/api/v1/messages/media/send',
-      args
+      body
     );
     return this.jsonResponse(data);
   }
@@ -2459,41 +2496,43 @@ export class MCPServer {
     chatId: string;
     messageId: string;
     toChatId: string;
+    account?: string;
   }) {
     if (process.env.ENABLE_SENDING !== 'true') {
       throw new McpError(ErrorCode.InvalidRequest, 'Sending disabled');
     }
+    const { account, ...body } = args;
     const data = await this.connectorCall(
-      this.connectorUrl,
+      this.waUrl(account),
       'POST',
       '/api/v1/messages/forward',
-      args
+      body
     );
     return this.jsonResponse(data);
   }
 
-  private async handleDeleteMessage(args: { chatId: string; messageId: string }) {
+  private async handleDeleteMessage(args: { chatId: string; messageId: string; account?: string }) {
     const data = await this.connectorCall(
-      this.connectorUrl,
+      this.waUrl(args.account),
       'DELETE',
       `/api/v1/messages/${args.chatId}/${args.messageId}`
     );
     return this.jsonResponse(data);
   }
 
-  private async handleGetMe() {
-    const data = await this.connectorCall(this.connectorUrl, 'GET', '/api/v1/me');
+  private async handleGetMe(args?: { account?: string }) {
+    const data = await this.connectorCall(this.waUrl(args?.account), 'GET', '/api/v1/me');
     return this.jsonResponse(data);
   }
 
-  private async handleGetUnreadChats() {
+  private async handleGetUnreadChats(args?: { account?: string }) {
     // The whatsapp-web.js connector enumerates every chat to compute unread —
     // can be slow on accounts with hundreds of chats. Cap at 8s so we don't
     // hang the SSE client; surface a clear error if the connector is too slow
     // (the user can fall back to list_conversations / get_user_messages).
     try {
       const data = await this.connectorCall(
-        this.connectorUrl,
+        this.waUrl(args?.account),
         'GET',
         '/api/v1/chats/unread',
         undefined,
@@ -2509,27 +2548,27 @@ export class MCPServer {
     }
   }
 
-  private async handleGetGroupInfo(args: { groupId: string }) {
+  private async handleGetGroupInfo(args: { groupId: string; account?: string }) {
     const data = await this.connectorCall(
-      this.connectorUrl,
+      this.waUrl(args.account),
       'GET',
       `/api/v1/groups/${args.groupId}/info`
     );
     return this.jsonResponse(data);
   }
 
-  private async handleGetGroupParticipants(args: { groupId: string }) {
+  private async handleGetGroupParticipants(args: { groupId: string; account?: string }) {
     const data = await this.connectorCall(
-      this.connectorUrl,
+      this.waUrl(args.account),
       'GET',
       `/api/v1/groups/${args.groupId}/participants`
     );
     return this.jsonResponse(data);
   }
 
-  private async handleRepairGroupSession(args: { groupId: string }) {
+  private async handleRepairGroupSession(args: { groupId: string; account?: string }) {
     const data = await this.connectorCall(
-      this.connectorUrl,
+      this.waUrl(args.account),
       'POST',
       `/api/v1/groups/${args.groupId}/session/repair`,
       {},
@@ -2579,7 +2618,12 @@ export class MCPServer {
     return this.jsonResponse(results);
   }
 
-  private async handleTelegramSearch(args: { query: string; chatId?: string; limit?: number; account?: string }) {
+  private async handleTelegramSearch(args: {
+    query: string;
+    chatId?: string;
+    limit?: number;
+    account?: string;
+  }) {
     const account = normalizeAccount(args.account);
     const limit = Math.min(args.limit ?? 20, 200);
     const params: any[] = [`%${args.query}%`, limit, account];
@@ -2644,7 +2688,11 @@ export class MCPServer {
     });
   }
 
-  private async handleTelegramParticipants(args: { chatId: string; limit?: number; account?: string }) {
+  private async handleTelegramParticipants(args: {
+    chatId: string;
+    limit?: number;
+    account?: string;
+  }) {
     const id = await this.resolveTelegramChatId(args.chatId, normalizeAccount(args.account));
     if (!id)
       throw new McpError(
