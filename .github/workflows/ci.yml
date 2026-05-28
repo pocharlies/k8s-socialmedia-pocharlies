@@ -26,7 +26,6 @@ jobs:
       images: |
         [
           {"name":"whatsappmcp-whatsapp-connector","context":".","dockerfile":"connectors/whatsapp-web/Dockerfile"},
-          {"name":"whatsappmcp-whatsapp-cloud-connector","context":".","dockerfile":"connectors/whatsapp-cloud/Dockerfile"},
           {"name":"whatsappmcp-telegram-connector","context":".","dockerfile":"connectors/telegram/Dockerfile"},
           {"name":"whatsappmcp-telegram-sync","context":".","dockerfile":"connectors/telegram-sync/Dockerfile"},
           {"name":"whatsappmcp-instagram-connector","context":".","dockerfile":"connectors/instagram/Dockerfile"},

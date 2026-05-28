@@ -20,8 +20,8 @@ import { t } from '../infrastructure/i18n/i18n';
 import pino from 'pino';
 
 const ACCOUNT_DESCRIPTION =
-  "Account to route this call to. 'personal' (default) = WhatsApp web (Baileys) + Telegram paxanguero. " +
-  "'professional' = WhatsApp Cloud API + Telegram sauvageadminbot (skirmshop). " +
+  "Account to route this call to. 'personal' (default) = WhatsApp web (Baileys, personal number) + Telegram paxanguero. " +
+  "'professional' = WhatsApp web (Baileys, business number) + Telegram sauvageadminbot (skirmshop). " +
   'Choose based on the destination chat: skirmshop/business chats → professional; family/personal chats → personal. ' +
   'When the destination is ambiguous, prefer "professional" for Claude/Codex agents.';
 
@@ -101,12 +101,13 @@ export class MCPServer {
     this.instagramUrl = process.env.INSTAGRAM_CONNECTOR_URL || 'http://instagram-connector:3003';
     this.connectorSecret = _connectorSharedSecret;
 
-    // Account routing. WhatsApp: personal = web (baileys), professional = cloud
-    // (official API). Telegram: two separate connector instances.
+    // Account routing. Both WhatsApp accounts are separate Baileys (WhatsApp
+    // Web) connector instances, each linked to its own number/session.
+    // Telegram: two separate connector instances too.
     this.waUrls = {
       personal: process.env.WHATSAPP_PERSONAL_URL || this.connectorUrl,
       professional:
-        process.env.WHATSAPP_PROFESSIONAL_URL || 'http://whatsapp-cloud-connector:3004',
+        process.env.WHATSAPP_PROFESSIONAL_URL || 'http://whatsapp-connector-professional:3001',
     };
     this.tgUrls = {
       personal: process.env.TELEGRAM_PERSONAL_URL || this.telegramUrl,
@@ -130,7 +131,7 @@ export class MCPServer {
     this.setupHandlers();
   }
 
-  /** WhatsApp connector URL for an account (personal = web, professional = cloud). */
+  /** WhatsApp connector URL for an account (both are Baileys/WhatsApp Web). */
   private waUrl(account?: string): string {
     return this.waUrls[account === 'professional' ? 'professional' : 'personal'];
   }
@@ -143,34 +144,6 @@ export class MCPServer {
   /** Telegram-sync (Telethon) bridge URL for an account — used by live unread. */
   private tgBridgeUrl(account?: string): string {
     return this.tgBridgeUrls[account === 'professional' ? 'professional' : 'personal'];
-  }
-
-  /**
-   * Reject tools that only the WhatsApp web (personal) connector implements when
-   * targeting the professional (Cloud) account, which only supports
-   * send/react/read/template/image/audio.
-   */
-  private assertWaCapability(account: string | undefined, tool: string): void {
-    const webOnly = new Set([
-      'send_file',
-      'download_media',
-      'forward_message',
-      'delete_message',
-      'get_me',
-      'get_unread_chats',
-      'get_group_info',
-      'get_group_participants',
-      'repair_group_session',
-      'renew_qr_code',
-      'get_connection_status',
-      'whatsapp_history_status',
-    ]);
-    if (account === 'professional' && webOnly.has(tool)) {
-      throw new McpError(
-        ErrorCode.InvalidRequest,
-        `Tool "${tool}" is not supported on the professional (WhatsApp Cloud) account; it is web-only.`
-      );
-    }
   }
 
   private setupHandlers(): void {
@@ -370,7 +343,7 @@ export class MCPServer {
           {
             name: 'whatsapp_send_message',
             description:
-              'Send a WhatsApp message directly (no draft flow). Routes by `account`: personal = WhatsApp web (Baileys), professional = WhatsApp Cloud API (skirmshop).',
+              'Send a WhatsApp message directly (no draft flow). Routes by `account`: personal = WhatsApp web (Baileys, personal number), professional = WhatsApp web (Baileys, skirmshop business number).',
             inputSchema: {
               type: 'object',
               properties: {
@@ -576,16 +549,11 @@ export class MCPServer {
           {
             name: 'mark_as_read',
             description:
-              'Mark a WhatsApp chat as read. Personal account routes to web `/read/:chatId`, professional routes to Cloud API messageId-based ack.',
+              'Mark a WhatsApp chat as read by chatId (both accounts are Baileys/WhatsApp Web).',
             inputSchema: {
               type: 'object',
               properties: {
                 chatId: { type: 'string', description: 'Chat ID to mark as read' },
-                messageId: {
-                  type: 'string',
-                  description:
-                    'Optional. For professional (Cloud API) the receipt requires the WA message id.',
-                },
                 ...ACCOUNT_PROPERTY,
               },
               required: ['chatId'],
@@ -1098,9 +1066,6 @@ export class MCPServer {
       const { name, arguments: args } = request.params;
 
       try {
-        // Reject WhatsApp web-only tools when targeting the professional (Cloud)
-        // account. No-op for personal and for any non-web-only tool.
-        this.assertWaCapability(normalizeAccount((args as any)?.account), name);
         switch (name) {
           case 'search_messages':
             return await this.handleSearchMessages(args as any);
@@ -2575,20 +2540,7 @@ export class MCPServer {
 
   private async handleMarkAsRead(args: { chatId?: string; messageId?: string; account?: string }) {
     const account = normalizeAccount(args.account);
-    if (account === 'professional') {
-      // WhatsApp Cloud marks a single message read (by wamid), not a whole chat.
-      if (!args.messageId) {
-        throw new McpError(
-          ErrorCode.InvalidParams,
-          'mark_as_read on the professional (WhatsApp Cloud) account requires a messageId (Cloud marks individual messages read, not whole chats).'
-        );
-      }
-      const data = await this.connectorCall(this.waUrl(account), 'POST', '/api/v1/messages/read', {
-        messageId: args.messageId,
-      });
-      return this.jsonResponse(data);
-    }
-    // web (personal): mark the whole chat read by chatId
+    // Both accounts are Baileys (WhatsApp Web): mark the whole chat read by chatId.
     if (!args.chatId) {
       throw new McpError(ErrorCode.InvalidParams, 'mark_as_read requires a chatId.');
     }
