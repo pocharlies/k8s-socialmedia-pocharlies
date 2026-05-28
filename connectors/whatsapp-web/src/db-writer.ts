@@ -191,6 +191,36 @@ export async function getConversationAvatar(id: string): Promise<string | null> 
 }
 
 /**
+ * Persist the delivery status of a message (pending/sent/delivered/read/failed/deleted).
+ * Idempotent — no-op if the row doesn't exist yet. status_at bumps on every change.
+ * Never downgrades (read > delivered > sent > pending).
+ */
+export async function setMessageStatus(waMessageId: string, status: string): Promise<void> {
+  if (!waMessageId) return;
+  const pool = getPool();
+  const rank: Record<string, number> = { pending: 1, sent: 2, delivered: 3, read: 4 };
+  if (rank[status] != null) {
+    await pool.query(
+      `UPDATE messages SET status = $2, status_at = now()
+       WHERE wa_message_id = $1
+         AND $3::int > CASE status
+              WHEN 'pending' THEN 1
+              WHEN 'sent' THEN 2
+              WHEN 'delivered' THEN 3
+              WHEN 'read' THEN 4
+              ELSE 0 END`,
+      [waMessageId, status, rank[status]]
+    );
+  } else {
+    // failed/deleted: overwrite regardless.
+    await pool.query(
+      `UPDATE messages SET status = $2, status_at = now() WHERE wa_message_id = $1`,
+      [waMessageId, status]
+    );
+  }
+}
+
+/**
  * Persist the real unread badge + archived flag for a conversation.
  * No-op if the row doesn't exist yet (next message creates it). `archived`
  * is optional — pass undefined to leave the stored value untouched.

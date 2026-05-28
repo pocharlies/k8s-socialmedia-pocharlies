@@ -54,8 +54,30 @@ import {
   setConversationAvatar,
   setParticipantAvatar,
   setConversationState,
+  setMessageStatus,
 } from './db-writer';
 import { uploadMedia, ensureMediaBucket, fetchMedia, uploadAvatar } from './media-storage';
+
+// WhatsApp Web message status enum → human/dashboard strings.
+// proto.WebMessageInfo.Status: ERROR=0, PENDING=1, SERVER_ACK=2, DELIVERY_ACK=3, READ=4, PLAYED=5
+function mapWaStatus(s: number): string | null {
+  switch (s) {
+    case 0:
+      return 'failed';
+    case 1:
+      return 'pending';
+    case 2:
+      return 'sent';
+    case 3:
+      return 'delivered';
+    case 4:
+      return 'read';
+    case 5:
+      return 'read';
+    default:
+      return null;
+  }
+}
 
 export interface WhatsAppMessage {
   waMessageId: string;
@@ -614,6 +636,28 @@ export class BaileysClient extends EventEmitter {
           stub === proto.WebMessageInfo.StubType.REVOKE || u.update?.message === null;
         if (isDeleted) {
           this.emit('message-update', { waMessageId, updateType: 'DELETED' });
+          void setMessageStatus(waMessageId, 'deleted').catch(() => {});
+        }
+        // Track delivery state from WhatsApp servers (the green ticks).
+        const st: number | undefined = (u.update as any)?.status;
+        if (typeof st === 'number') {
+          const mapped = mapWaStatus(st);
+          if (mapped) void setMessageStatus(waMessageId, mapped).catch(() => {});
+        }
+      }
+    });
+
+    // Receipts from individual recipients (group "✓✓ for everyone" or read).
+    sock.ev.on('message-receipt.update' as any, (updates: any[]) => {
+      for (const u of updates || []) {
+        const waMessageId = u?.key?.id;
+        const t: 'read' | 'delivered' | null = u?.receipt?.readTimestamp
+          ? 'read'
+          : u?.receipt?.receiptTimestamp
+            ? 'delivered'
+            : null;
+        if (waMessageId && t) {
+          void setMessageStatus(waMessageId, t).catch(() => {});
         }
       }
     });
