@@ -584,6 +584,27 @@ spec:
   tls:
     store: { name: default, namespace: traefik-lan }
 ---
+# LAN-only IngressRoute for the MCP SSE server (port 3010) — so Claude/Codex
+# clients on any LAN/Tailscale host (pc, mac, dgx, dgx2, x86, sauvage) can
+# reach it over HTTPS without exposing it to the public internet. Auth is the
+# Bearer MCP_SSE_AUTH_TOKEN from whatsapp-mcp-sse-secrets (already enforced
+# by the server when the env var is set).
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: mcp-socialmedia-lan
+  namespace: whatsapp-mcp
+spec:
+  entryPoints: [websecure]
+  routes:
+    - match: Host(`mcp-socialmedia.lan.e-dani.com`)
+      kind: Rule
+      services:
+        - name: mcp-sse
+          port: 3010
+  tls:
+    store: { name: default, namespace: traefik-lan }
+---
 # Telegram-sync (message sync worker)
 apiVersion: apps/v1
 kind: Deployment
