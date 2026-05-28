@@ -216,8 +216,10 @@ export function createRouter(
         const body = req.body as { conversationId?: string; messageId?: string; emoji?: string };
         const { conversationId, messageId, emoji } = body;
 
-        if (!conversationId || !messageId || !emoji) {
-          res.status(400).json({ error: 'Missing conversationId, messageId, or emoji' });
+        // Empty `emoji` is a valid signal to REMOVE the reaction. Baileys
+        // accepts `{ react: { text: '', key } }` for un-react.
+        if (!conversationId || !messageId) {
+          res.status(400).json({ error: 'Missing conversationId or messageId' });
           return;
         }
 
@@ -226,11 +228,11 @@ export function createRouter(
           return;
         }
 
-        await client.reactToMessage(conversationId, messageId, emoji);
+        await client.reactToMessage(conversationId, messageId, emoji || '');
 
         res.json({
           reacted: true,
-          emoji,
+          emoji: emoji || '',
           messageId,
           reactedAt: new Date().toISOString(),
         });
