@@ -8,8 +8,8 @@ patches:
   - path: patch-image.yaml
 images:
   - name: harbor.e-dani.com/homelab/whatsappmcp-whatsapp-connector
-    newTag: v1.3.18
-    digest: sha256:eeec0f2a0c12a0708c3175d2f5affb0cbb55be03a57de88ede899cf840573903
+    newTag: v1.3.19
+    digest: sha256:61ea1209d36e637bb7b0ba7c17d4cc166419f8cc85cc07ab81555006ae516897
   - name: harbor.e-dani.com/homelab/whatsappmcp-telegram-connector
     newTag: v1.3.16
     digest: sha256:b06dce3448da9ec200116d839d1ba1de90367c87838758d65e887d99a6f85073
@@ -20,5 +20,5 @@ images:
     newTag: v1.3.12
     digest: sha256:33d980dc270af8a6942a762c122428712250714e35003f7435e7f47d2f91aa07
   - name: harbor.e-dani.com/homelab/whatsappmcp-mcp-server
-    newTag: v1.3.16
-    digest: sha256:583efc72a22a9415b7381cc3c2b3ec22703f63cca6f46bf517ba8a52bc1646ad
+    newTag: v1.3.19
+    digest: sha256:5d05efde9d5ef37439bd559d9cb7abb20cfa05a05d373468f08d532f4f524821
