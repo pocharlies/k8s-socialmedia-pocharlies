@@ -205,12 +205,12 @@ export function createRouter(client: TelegramClientWrapper, sharedSecret: string
   router.post('/messages/media/send', (req: Request, res: Response): void => {
     void (async () => {
       try {
-        const { chatId, filePath, caption, voiceNote, videoNote } = req.body;
+        const { chatId, filePath, caption, voiceNote, videoNote, sticker } = req.body;
         if (!chatId || !filePath) {
           res.status(400).json({ error: 'Missing chatId or filePath' });
           return;
         }
-        await client.sendFile(chatId, filePath, { caption, voiceNote, videoNote });
+        await client.sendFile(chatId, filePath, { caption, voiceNote, videoNote, sticker });
         res.json({ sent: true });
       } catch (e) {
         res.status(500).json({ error: String(e) });

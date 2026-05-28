@@ -1159,7 +1159,12 @@ export class BaileysClient extends EventEmitter {
     }
   }
 
-  async sendFile(chatId: string, fileUrl: string, caption?: string): Promise<void> {
+  async sendFile(
+    chatId: string,
+    fileUrl: string,
+    caption?: string,
+    options?: { asSticker?: boolean }
+  ): Promise<void> {
     if (!this.sock) throw new Error('Client not initialized');
     const raw = this.toRawJid(chatId);
     const res = await fetch(fileUrl);
@@ -1169,7 +1174,11 @@ export class BaileysClient extends EventEmitter {
     const fileName = fileUrl.split('/').pop() || 'attachment';
 
     let payload: AnyMessageContent;
-    if (contentType.startsWith('image/')) payload = { image: buf, caption };
+    // Stickers: WhatsApp expects webp; baileys handles conversion when the
+    // payload is `{ sticker: buf }` and the bytes are a static webp/animated.
+    if (options?.asSticker || contentType === 'image/webp') {
+      payload = { sticker: buf };
+    } else if (contentType.startsWith('image/')) payload = { image: buf, caption };
     else if (contentType.startsWith('video/')) payload = { video: buf, caption };
     else if (contentType.startsWith('audio/'))
       payload = { audio: buf, mimetype: contentType, ptt: false };

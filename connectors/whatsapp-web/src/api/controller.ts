@@ -442,12 +442,14 @@ export function createRouter(
           res.status(403).json({ error: 'Sending disabled' });
           return;
         }
-        const { conversationId, fileUrl, caption } = req.body;
+        const { conversationId, fileUrl, caption, asSticker, kind } = req.body;
         if (!conversationId || !fileUrl) {
           res.status(400).json({ error: 'Missing conversationId or fileUrl' });
           return;
         }
-        await client.sendFile(conversationId, fileUrl, caption);
+        await client.sendFile(conversationId, fileUrl, caption, {
+          asSticker: !!asSticker || kind === 'sticker',
+        });
         res.json({ sent: true, sentAt: new Date().toISOString() });
       } catch (e) {
         res.status(500).json({ error: String(e) });

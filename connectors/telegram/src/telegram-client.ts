@@ -497,7 +497,12 @@ export class TelegramClientWrapper extends EventEmitter {
   async sendFile(
     chatId: string,
     filePath: string,
-    options?: { caption?: string; voiceNote?: boolean; videoNote?: boolean }
+    options?: {
+      caption?: string;
+      voiceNote?: boolean;
+      videoNote?: boolean;
+      sticker?: boolean;
+    }
   ): Promise<void> {
     if (!this.connected) throw new Error('Not connected');
     // Fetch remote http(s) URLs connector-side and upload the bytes. Passing a URL
@@ -510,7 +515,14 @@ export class TelegramClientWrapper extends EventEmitter {
       source = Buffer.from(await resp.arrayBuffer());
     }
     let media;
-    if (options?.voiceNote) {
+    if (options?.sticker) {
+      // mtcute: stickers go as documents with the sticker MIME so Telegram renders
+      // them inline (.webp / .tgs / .webm).
+      media = InputMedia.document(source, {
+        fileName: 'sticker.webp',
+        fileMime: 'image/webp',
+      });
+    } else if (options?.voiceNote) {
       media = InputMedia.voice(source, {
         fileName: 'voice.ogg',
         ...(options.caption ? { caption: options.caption } : {}),
