@@ -8,7 +8,7 @@ spec:
     spec:
       containers:
         - name: whatsapp-connector
-          image: harbor.e-dani.com/homelab/whatsappmcp-whatsapp-connector:v1.3.19@sha256:61ea1209d36e637bb7b0ba7c17d4cc166419f8cc85cc07ab81555006ae516897
+          image: harbor.e-dani.com/homelab/whatsappmcp-whatsapp-connector:v1.3.20@sha256:050c905d92522e94c505d9f39428c984e3fe5cca887f642f45499600c3fd48f3
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -20,7 +20,7 @@ spec:
     spec:
       containers:
         - name: whatsapp-connector-professional
-          image: harbor.e-dani.com/homelab/whatsappmcp-whatsapp-connector:v1.3.19@sha256:61ea1209d36e637bb7b0ba7c17d4cc166419f8cc85cc07ab81555006ae516897
+          image: harbor.e-dani.com/homelab/whatsappmcp-whatsapp-connector:v1.3.20@sha256:050c905d92522e94c505d9f39428c984e3fe5cca887f642f45499600c3fd48f3
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -56,7 +56,7 @@ spec:
     spec:
       containers:
         - name: mcp-server
-          image: harbor.e-dani.com/homelab/whatsappmcp-mcp-server:v1.3.19@sha256:5d05efde9d5ef37439bd559d9cb7abb20cfa05a05d373468f08d532f4f524821
+          image: harbor.e-dani.com/homelab/whatsappmcp-mcp-server:v1.3.20@sha256:d646b8711d4c705455286db2fc664cb6b913e05d7ffca45dd1ab4101a63319c7
 ---
 apiVersion: apps/v1
 kind: Deployment
