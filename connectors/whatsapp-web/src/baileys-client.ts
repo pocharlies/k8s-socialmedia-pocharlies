@@ -57,6 +57,7 @@ import {
   setMessageStatus,
 } from './db-writer';
 import { uploadMedia, ensureMediaBucket, fetchMedia, uploadAvatar } from './media-storage';
+import { notifyDashboard as dashboardNotify } from './dashboard-notifier';
 
 // WhatsApp Web message status enum → human/dashboard strings.
 // proto.WebMessageInfo.Status: ERROR=0, PENDING=1, SERVER_ACK=2, DELIVERY_ACK=3, READ=4, PLAYED=5
@@ -321,6 +322,11 @@ export class BaileysClient extends EventEmitter {
   // In-memory mirrors. Baileys removed makeInMemoryStore, so we keep the
   // minimum we need for the existing API contract.
   private chatStore = new Map<string, CachedChat>(); // by normalised JID
+  // Display names indexed by raw participant JID — populated when we ingest
+  // a message; used by the presence.update handler to label "X is typing…".
+  private contactNames = new Map<string, string>();
+  // Track which JIDs we've already presenceSubscribed to so we don't spam.
+  private presenceSubscribed = new Set<string>();
   private groupMetaCache = new Map<string, GroupMetadata>(); // by raw JID
   private keyCache = new Map<string, { key: WAMessageKey; chatJid: string }>(); // by waMessageId
   private retryMessageCache: CacheStore;
@@ -483,6 +489,11 @@ export class BaileysClient extends EventEmitter {
         // archived to the DB, so the dashboard shows the real badges without
         // waiting for new traffic. Fire-and-forget; safe if it fails.
         void this.resyncChatState('connection-open');
+        // Subscribe to presence for the most-recently-active chats so we
+        // receive "composing"/"recording" updates and can forward typing
+        // indicators to the dashboard. baileys auto-renews subscriptions
+        // while the socket stays open.
+        void this.subscribePresenceForActiveChats(200);
         return;
       }
 
@@ -623,6 +634,37 @@ export class BaileysClient extends EventEmitter {
         });
         // Persist real unread badge + archived flag (fire-and-forget).
         void setConversationState(norm, c.unreadCount || 0, !!(c as any).archived).catch(() => {});
+        // Subscribe to presence so we get typing updates for this chat.
+        void this.presenceSubscribeSilent(c.id);
+      }
+    });
+
+    // Presence updates → typing indicator. Payload shape:
+    //   { id: chatJid, presences: { [participantJid]: { lastKnownPresence, lastSeen? } } }
+    // We forward only "composing"/"recording" — paused/available means stop.
+    sock.ev.on('presence.update' as any, (evt: any) => {
+      try {
+        const chatJid: string = evt?.id;
+        const presences: Record<string, any> = evt?.presences || {};
+        if (!chatJid || !presences) return;
+        const convId = this.normalizeJid(chatJid);
+        for (const [participantJid, p] of Object.entries(presences)) {
+          const status = p?.lastKnownPresence;
+          if (status !== 'composing' && status !== 'recording') continue;
+          // Lookup display name from the participants we've seen
+          const name = this.contactNames.get(participantJid)
+            || this.contactNames.get(this.normalizeJid(participantJid))
+            || null;
+          void dashboardNotify('/_connector/typing', {
+            conversation_id: convId,
+            sender_id: participantJid,
+            sender_name: name,
+            status: 'composing',
+            ttl_ms: 8000,  // baileys re-emits every ~5s; 8s TTL keeps it lit
+          });
+        }
+      } catch (e) {
+        this.logger.warn(`presence.update handler failed: ${(e as Error).message}`);
       }
     });
 
@@ -812,6 +854,12 @@ export class BaileysClient extends EventEmitter {
       ? this.meJid || waMessage.senderWaId
       : msg.key.participant || rawChatJid;
     const pushName = msg.pushName || undefined;
+    // Cache the display name keyed by the raw participant JID so the
+    // presence.update handler can label "Manu está escribiendo…".
+    if (pushName) {
+      this.contactNames.set(senderRaw, pushName);
+      this.contactNames.set(waMessage.senderWaId, pushName);
+    }
     await ensureParticipant({
       id: waMessage.senderWaId,
       name: pushName,
@@ -1321,6 +1369,42 @@ export class BaileysClient extends EventEmitter {
       isAdmin: p.admin === 'admin' || p.admin === 'superadmin',
       isSuperAdmin: p.admin === 'superadmin',
     }));
+  }
+
+  /**
+   * Idempotent presenceSubscribe: silently no-ops if already subscribed or
+   * if the socket is down. baileys auto-renews subscriptions while the
+   * socket stays open, so we just need to subscribe once per chat.
+   */
+  private async presenceSubscribeSilent(rawJid: string | null | undefined): Promise<void> {
+    if (!rawJid || !this.sock) return;
+    if (this.presenceSubscribed.has(rawJid)) return;
+    try {
+      await this.sock.presenceSubscribe(rawJid);
+      this.presenceSubscribed.add(rawJid);
+    } catch {
+      // server may reject (rate-limited, unknown chat, etc.) — swallow
+    }
+  }
+
+  /**
+   * Subscribe to presence for the N most-recently-active chats so we get
+   * typing updates for them. Called once after connection.update→open. We
+   * cap N to avoid spamming the WhatsApp server with hundreds of subscribes.
+   */
+  private async subscribePresenceForActiveChats(limit: number): Promise<void> {
+    const chats = Array.from(this.chatStore.values())
+      .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
+      .slice(0, limit);
+    let n = 0;
+    for (const c of chats) {
+      if (!c.rawJid) continue;
+      await this.presenceSubscribeSilent(c.rawJid);
+      n++;
+      // Tiny pacing so we don't burst the upstream all at once.
+      if (n % 25 === 0) await new Promise(r => setTimeout(r, 50));
+    }
+    this.logger.info(`Subscribed to presence for ${n} active chats`);
   }
 
   /**

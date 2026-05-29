@@ -181,6 +181,28 @@ export function createRouter(client: TelegramClientWrapper, sharedSecret: string
   });
 
   /**
+   * GET /messages/reactors/:chatId/:msgId - Per-reactor identity for a message.
+   * Returns `[{emoji, userId, displayName, mine}]`. Used by the dashboard's
+   * "who reacted?" tooltip when the user hovers/clicks a reaction badge.
+   */
+  router.get('/messages/reactors/:chatId/:msgId', (req: Request, res: Response): void => {
+    void (async () => {
+      try {
+        const msgId = parseInt(req.params.msgId, 10);
+        const limit = parseInt((req.query.limit as string) || '100', 10);
+        if (Number.isNaN(msgId)) {
+          res.status(400).json({ error: 'Bad msgId' });
+          return;
+        }
+        const reactors = await client.getReactionUsers(req.params.chatId, msgId, limit);
+        res.json({ reactors: reactors || [] });
+      } catch (e) {
+        res.status(500).json({ error: String(e) });
+      }
+    })();
+  });
+
+  /**
    * POST /messages/react - Add or clear an emoji reaction on a message
    */
   router.post('/messages/react', (req: Request, res: Response): void => {

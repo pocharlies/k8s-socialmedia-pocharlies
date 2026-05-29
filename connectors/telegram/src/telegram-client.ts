@@ -541,6 +541,43 @@ export class TelegramClientWrapper extends EventEmitter {
   }
 
   /**
+   * Fetch the per-reactor identity for a given message: who reacted with what.
+   * Returns null if the message isn't reachable. Used by the dashboard's
+   * reaction-badge tooltip to show "Alice, Bob — 👍".
+   */
+  async getReactionUsers(
+    chatId: string,
+    messageId: number,
+    limit = 100
+  ): Promise<Array<{ emoji: string; userId: number; displayName: string | null; mine: boolean }> | null> {
+    if (!this.connected) throw new Error('Not connected');
+    try {
+      const peer = toMtcutePeer(chatId);
+      const result: any = await (this.client as any).getReactionUsers({
+        chatId: peer,
+        message: messageId,
+        limit,
+      });
+      const raw = Array.isArray(result) ? result : (result?.items || []);
+      const meId = this.selfId ? Number(this.selfId) : null;
+      const out: Array<{ emoji: string; userId: number; displayName: string | null; mine: boolean }> = [];
+      for (const pr of raw) {
+        const emoji = typeof pr.emoji === 'string' ? pr.emoji : String(pr.emoji);
+        const peerObj: any = pr.peer;
+        const userId: number | undefined = peerObj?.id ?? peerObj?.userId;
+        if (typeof userId !== 'number') continue;
+        const displayName: string | null =
+          peerObj?.displayName || peerObj?.firstName || peerObj?.username || peerObj?.title || null;
+        out.push({ emoji, userId, displayName, mine: meId !== null && userId === meId });
+      }
+      return out;
+    } catch (e) {
+      this.logger.warn(`getReactionUsers failed for ${chatId}/${messageId}: ${(e as Error).message}`);
+      return null;
+    }
+  }
+
+  /**
    * Download media from a message
    */
   async downloadMedia(chatId: string, messageId: number): Promise<Buffer | null> {
