@@ -17,7 +17,10 @@ export async function notifyDashboard(path: string, payload: Record<string, unkn
   const { ts, sig } = sign(body);
   try {
     const ac = new AbortController();
-    const timer = setTimeout(() => ac.abort(), 4000);
+    // Dashboard's asyncpg pool cold-starts can take 5-8s after a restart;
+    // 4s was firing the abort before fetch had a chance. 12s leaves headroom
+    // without holding the typing handler for too long.
+    const timer = setTimeout(() => ac.abort(), 12000);
     const res = await fetch(`${DASHBOARD_URL}/api/messages${path}`, {
       method: 'POST',
       headers: {
