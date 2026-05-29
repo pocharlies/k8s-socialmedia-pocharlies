@@ -2988,4 +2988,25 @@ export class MCPServer {
   getServer(): Server {
     return this.server;
   }
+
+  /**
+   * Returns a FRESH, isolated MCP Server bound to the shared services, for the
+   * Streamable-HTTP transport. Each HTTP session must get its own Server so the
+   * SDK Protocol._transport routes responses to the right client (the legacy SSE
+   * path shares a single Server and only routes correctly for one live client).
+   * setupHandlers() only registers handlers on this.server, and those handlers
+   * close over the shared services (db/redis/openai), so the swap below is cheap
+   * and side-effect free.
+   */
+  createSessionServer(): Server {
+    const prev = this.server;
+    const fresh = new Server(
+      { name: "messaging-mcp-server", version: "1.0.0" },
+      { capabilities: { tools: {} } }
+    );
+    this.server = fresh;
+    this.setupHandlers();
+    this.server = prev;
+    return fresh;
+  }
 }

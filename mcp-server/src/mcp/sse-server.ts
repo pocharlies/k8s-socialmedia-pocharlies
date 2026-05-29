@@ -10,6 +10,9 @@ import { Pool } from 'pg';
 import Redis, { RedisOptions } from 'ioredis';
 import * as fs from 'fs';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
+import { randomUUID } from 'node:crypto';
 import { MCPServer } from './server';
 
 const DATABASE_URL =
@@ -38,6 +41,33 @@ interface SessionRecord {
   heartbeat: NodeJS.Timeout;
   maxAgeTimer: NodeJS.Timeout;
   cleanup: (reason: string) => void;
+}
+
+/** Buffer and JSON-parse a request body (server uses raw node:http, not express). */
+function readJsonBody(req: IncomingMessage): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    let size = 0;
+    req.on('data', (c: Buffer) => {
+      size += c.length;
+      if (size > 4 * 1024 * 1024) {
+        reject(new Error('request body too large'));
+        req.destroy();
+        return;
+      }
+      chunks.push(c);
+    });
+    req.on('end', () => {
+      const raw = Buffer.concat(chunks).toString('utf-8');
+      if (!raw) return resolve(undefined);
+      try {
+        resolve(JSON.parse(raw));
+      } catch (e) {
+        reject(e);
+      }
+    });
+    req.on('error', reject);
+  });
 }
 
 async function main() {
@@ -74,6 +104,25 @@ async function main() {
 
   const sessions = new Map<string, SessionRecord>();
 
+  // Streamable-HTTP sessions. Each owns an isolated MCP Server (correct response
+  // routing per client), unlike the shared-server SSE path above.
+  interface StreamableSession {
+    transport: StreamableHTTPServerTransport;
+    createdAt: number;
+    maxAgeTimer: NodeJS.Timeout;
+  }
+  const streamableSessions = new Map<string, StreamableSession>();
+
+  const closeStreamable = (sid: string, reason: string) => {
+    const session = streamableSessions.get(sid);
+    if (!session) return;
+    streamableSessions.delete(sid);
+    clearTimeout(session.maxAgeTimer);
+    const ageSec = Math.round((Date.now() - session.createdAt) / 1000);
+    console.log(`[MCP] Streamable session ${sid} ${reason} age=${ageSec}s (${streamableSessions.size} active)`);
+    void session.transport.close().catch(() => {});
+  };
+
   const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse) => {
     const url = new URL(req.url || '/', `http://localhost:${SSE_PORT}`);
 
@@ -90,7 +139,14 @@ async function main() {
     // Health check (no auth required)
     if (url.pathname === '/health') {
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ status: 'ok', transport: 'sse', sessions: sessions.size }));
+      res.end(
+        JSON.stringify({
+          status: 'ok',
+          transport: 'sse+streamable-http',
+          sessions: sessions.size,
+          streamableSessions: streamableSessions.size,
+        })
+      );
       return;
     }
 
@@ -102,6 +158,76 @@ async function main() {
         res.end(JSON.stringify({ error: 'Unauthorized' }));
         return;
       }
+    }
+
+    // Streamable-HTTP endpoint (modern MCP transport, spec 2025-03-26).
+    // POST = client->server (initialize opens a session), GET = server->client
+    // notification stream, DELETE = explicit teardown. Session id travels in the
+    // `mcp-session-id` header.
+    if (url.pathname === '/mcp') {
+      const sid = req.headers['mcp-session-id'] as string | undefined;
+
+      if (req.method === 'POST') {
+        let body: unknown;
+        try {
+          body = await readJsonBody(req);
+        } catch {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ jsonrpc: '2.0', error: { code: -32700, message: 'Parse error' }, id: null }));
+          return;
+        }
+
+        const existing = sid ? streamableSessions.get(sid) : undefined;
+        if (existing) {
+          await existing.transport.handleRequest(req, res, body);
+          return;
+        }
+
+        // No (valid) session: only an `initialize` request may open one.
+        if (!isInitializeRequest(body)) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(
+            JSON.stringify({
+              jsonrpc: '2.0',
+              error: { code: -32000, message: 'Bad Request: no valid session id' },
+              id: null,
+            })
+          );
+          return;
+        }
+
+        const transport = new StreamableHTTPServerTransport({
+          sessionIdGenerator: () => randomUUID(),
+          onsessioninitialized: (newSid: string) => {
+            const maxAgeTimer = setTimeout(() => closeStreamable(newSid, 'max-age'), SESSION_MAX_AGE_MS);
+            streamableSessions.set(newSid, { transport, createdAt: Date.now(), maxAgeTimer });
+            console.log(`[MCP] New streamable session ${newSid} (${streamableSessions.size} active)`);
+          },
+        });
+        transport.onclose = () => {
+          if (transport.sessionId) closeStreamable(transport.sessionId, 'closed');
+        };
+
+        const sessionServer = mcpServer.createSessionServer();
+        await sessionServer.connect(transport);
+        await transport.handleRequest(req, res, body);
+        return;
+      }
+
+      if (req.method === 'GET' || req.method === 'DELETE') {
+        const session = sid ? streamableSessions.get(sid) : undefined;
+        if (!session) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Invalid or missing mcp-session-id' }));
+          return;
+        }
+        await session.transport.handleRequest(req, res);
+        return;
+      }
+
+      res.writeHead(405, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Method not allowed' }));
+      return;
     }
 
     // Admin: list active sessions
@@ -227,6 +353,7 @@ async function main() {
   const shutdown = async (signal: string) => {
     console.log(`[SSE] ${signal} received, shutting down...`);
     for (const s of sessions.values()) s.cleanup(`shutdown-${signal}`);
+    for (const sid of Array.from(streamableSessions.keys())) closeStreamable(sid, `shutdown-${signal}`);
     httpServer.close();
     await dbPool.end();
     await redisClient.quit();
