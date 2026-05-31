@@ -37,6 +37,7 @@ export class InstagramIngestionService {
 
   async handleEvent(event: InstagramEvent): Promise<void> {
     try {
+      const account = routeInstagramAccount(event.account);
       // DM events have a real message id and conversation; comments/mentions are
       // attached to a media post and we synthesise a conversation key per post.
       const ts = new Date(event.timestamp || new Date().toISOString());
@@ -96,22 +97,24 @@ export class InstagramIngestionService {
       };
 
       await this.dbClient.query(
-        `INSERT INTO conversations (id, name, is_group, type, wa_chat_id, last_message_at)
-         VALUES ($1, $2, $3, $4, $1, $5)
+        `INSERT INTO conversations (id, name, is_group, type, wa_chat_id, last_message_at, account)
+         VALUES ($1, $2, $3, $4, $1, $5, $6)
          ON CONFLICT (id) DO UPDATE SET
            name = COALESCE(EXCLUDED.name, conversations.name),
+           account = EXCLUDED.account,
            last_message_at = GREATEST(conversations.last_message_at, EXCLUDED.last_message_at),
            updated_at = now()`,
-        [convId, convName, isGroup, convType, ts]
+        [convId, convName, isGroup, convType, ts, account]
       );
 
       await this.dbClient.query(
-        `INSERT INTO participants (id, name, push_name, last_seen)
-         VALUES ($1, $2, $2, now())
+        `INSERT INTO participants (id, name, push_name, last_seen, account)
+         VALUES ($1, $2, $2, now(), $3)
          ON CONFLICT (id) DO UPDATE SET
            name = COALESCE(EXCLUDED.name, participants.name),
+           account = EXCLUDED.account,
            last_seen = now()`,
-        [senderWaId, senderName]
+        [senderWaId, senderName, account]
       );
 
       await this.dbClient.query(
@@ -123,10 +126,10 @@ export class InstagramIngestionService {
       const result = await this.dbClient.query(
         `INSERT INTO messages (
            wa_message_id, conversation_id, sender_wa_id, wa_timestamp,
-           direction, content, message_type, is_forwarded, platform, metadata
-         ) VALUES ($1, $2, $3, $4, 'INBOUND', $5, $6, false, 'instagram', $7)
+           direction, content, message_type, is_forwarded, platform, metadata, account
+         ) VALUES ($1, $2, $3, $4, 'INBOUND', $5, $6, false, 'instagram', $7, $8)
          ON CONFLICT (wa_message_id) DO NOTHING`,
-        [waMessageId, convId, senderWaId, ts, content, messageType, JSON.stringify(metadata)]
+        [waMessageId, convId, senderWaId, ts, content, messageType, JSON.stringify(metadata), account]
       );
 
       if ((result.rowCount || 0) > 0) {
@@ -136,4 +139,8 @@ export class InstagramIngestionService {
       this.logger.error(`Failed to ingest IG event: ${error}`);
     }
   }
+}
+
+function routeInstagramAccount(instagramAccount: string): 'personal' | 'professional' {
+  return instagramAccount === 'skirmshop' ? 'professional' : 'personal';
 }

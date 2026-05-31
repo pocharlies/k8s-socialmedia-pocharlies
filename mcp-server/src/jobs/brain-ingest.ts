@@ -14,6 +14,7 @@
  *   BRAIN_URL             brain base url (default in-cluster service)
  *   BRAIN_API_KEY         X-API-Key for push-ingest (brain dashboard_api_key)
  *   BRAIN_INGEST_BATCH    rows per batch (default 500)
+ *   BRAIN_INGEST_MAX_ROWS optional per-account row cap for safe replay/dry-runs
  *   BRAIN_INGEST_BACKFILL 'true' => on first run (no cursor) start from epoch
  *                         instead of now() — used for the one-off history backfill.
  *   BRAIN_INGEST_SINCE    ISO timestamp; with BACKFILL, lower bound to start from.
@@ -30,6 +31,7 @@ const BRAIN_URL =
   process.env.BRAIN_URL || 'http://skirmshop-brain.skirmshop-brain-prod.svc.cluster.local';
 const BRAIN_API_KEY = process.env.BRAIN_API_KEY || '';
 const BATCH = parseInt(process.env.BRAIN_INGEST_BATCH || '500', 10);
+const MAX_ROWS = parseInt(process.env.BRAIN_INGEST_MAX_ROWS || '0', 10);
 const BACKFILL = process.env.BRAIN_INGEST_BACKFILL === 'true';
 const SINCE = process.env.BRAIN_INGEST_SINCE || '1970-01-01T00:00:00Z';
 const DRY_RUN = process.env.BRAIN_INGEST_DRY_RUN === 'true';
@@ -55,6 +57,7 @@ interface Row {
   account: string;
   direction: string;
   message_type: string;
+  metadata: Record<string, unknown> | null;
   wa_timestamp: Date;
   created_at: Date;
   sender_wa_id: string | null;
@@ -119,15 +122,32 @@ async function setCursor(
 }
 
 function sourceId(platform: string, waMessageId: string): string {
-  return platform === 'telegram' ? `tg:${waMessageId}` : `wa:${waMessageId}`;
+  switch ((platform || '').toLowerCase()) {
+    case 'telegram':
+      return `tg:${waMessageId}`;
+    case 'instagram':
+      return `ig:${waMessageId}`;
+    case 'whatsapp':
+      return `wa:${waMessageId}`;
+    default:
+      return `${platform || 'msg'}:${waMessageId}`;
+  }
 }
 
-async function fetchBatch(pool: Pool, account: Account, cursor: Cursor): Promise<Row[]> {
+function adapterForPlatform(platform: string): string {
+  const normalized = (platform || '').toLowerCase();
+  if (normalized === 'telegram' || normalized === 'instagram') {
+    return normalized;
+  }
+  return 'whatsapp';
+}
+
+async function fetchBatch(pool: Pool, account: Account, cursor: Cursor, limit: number): Promise<Row[]> {
   // Keyset pagination on (created_at, id) so duplicate created_at can't skip rows.
   // messages.id is bigint; coalesce missing cursor to 0 for the first batch.
   const r = await pool.query(
     `SELECT m.id, m.wa_message_id, m.content, m.platform, m.account, m.direction,
-            m.message_type, m.wa_timestamp, m.created_at, m.sender_wa_id,
+            m.message_type, m.metadata, m.wa_timestamp, m.created_at, m.sender_wa_id,
             m.conversation_id, c.name AS conversation_name
        FROM messages m
        JOIN conversations c ON c.id = m.conversation_id
@@ -137,7 +157,7 @@ async function fetchBatch(pool: Pool, account: Account, cursor: Cursor): Promise
         AND (m.created_at, m.id) > ($2::timestamptz, COALESCE($3::bigint, 0::bigint))
       ORDER BY m.created_at ASC, m.id ASC
       LIMIT $4`,
-    [account, cursor.last_created_at, cursor.last_id, BATCH]
+    [account, cursor.last_created_at, cursor.last_id, limit]
   );
   return r.rows as Row[];
 }
@@ -167,10 +187,15 @@ async function pushToBrain(
 }
 
 function toDoc(row: Row): BrainDoc {
+  const extra =
+    row.metadata && typeof row.metadata === 'object' && !Array.isArray(row.metadata)
+      ? row.metadata
+      : {};
   return {
     source_id: sourceId(row.platform, row.wa_message_id),
     content: row.content,
     metadata: {
+      ...extra,
       type: 'message',
       platform: row.platform,
       account: row.account,
@@ -179,6 +204,7 @@ function toDoc(row: Row): BrainDoc {
       conversation_id: row.conversation_id,
       conversation_name: row.conversation_name,
       sender_wa_id: row.sender_wa_id,
+      sender_id: row.sender_wa_id,
       wa_timestamp:
         row.wa_timestamp instanceof Date
           ? row.wa_timestamp.toISOString()
@@ -211,13 +237,17 @@ async function ingestAccount(pool: Pool, account: Account): Promise<void> {
   let totalChunks = 0;
 
   for (;;) {
-    const rows = await fetchBatch(pool, account, cursor);
+    const remaining = MAX_ROWS > 0 ? MAX_ROWS - totalRows : BATCH;
+    if (MAX_ROWS > 0 && remaining <= 0) break;
+
+    const batchLimit = MAX_ROWS > 0 ? Math.min(BATCH, remaining) : BATCH;
+    const rows = await fetchBatch(pool, account, cursor, batchLimit);
     if (rows.length === 0) break;
 
     // Group by platform — push-ingest takes one adapter per call.
     const byPlatform = new Map<string, BrainDoc[]>();
     for (const row of rows) {
-      const adapter = row.platform === 'telegram' ? 'telegram' : 'whatsapp';
+      const adapter = adapterForPlatform(row.platform);
       const arr = byPlatform.get(adapter) ?? [];
       arr.push(toDoc(row));
       byPlatform.set(adapter, arr);
@@ -239,11 +269,11 @@ async function ingestAccount(pool: Pool, account: Account): Promise<void> {
     cursor = { last_created_at: last.created_at.toISOString(), last_id: last.id };
     if (!DRY_RUN) await setCursor(pool, account, cursor.last_created_at, cursor.last_id);
 
-    if (rows.length < BATCH) break;
+    if (rows.length < batchLimit) break;
   }
 
   logger.info(
-    { account, instance, rows: totalRows, chunks: totalChunks, dryRun: DRY_RUN },
+    { account, instance, rows: totalRows, chunks: totalChunks, dryRun: DRY_RUN, maxRows: MAX_ROWS },
     'account ingest done'
   );
 }
